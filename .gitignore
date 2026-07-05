@@ -41,9 +41,14 @@ htmlcov/
 Thumbs.db
 
 # Project-specific
+# Clarius SDK binaries + TLS material (must stay at repo root; not committed)
+libcast.dylib
 pyclariuscast.so
 pri.pem
 tls.crt
-clarius_sessions/
+
+# Large / regenerable data (kept locally, not committed)
+data/
 media/
-libcast.dylib
+
+# Note: handeye.json (calibration result) and outputs/ are intentionally tracked.

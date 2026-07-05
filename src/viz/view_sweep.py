@@ -2,13 +2,13 @@
 """
 view_sweep.py — visualize a completed sweep
 
-Reads a clarius_sessions/section_<N>/ folder, decodes each raw_<ts>.bin into
+Reads a data/clarius_sessions/section_<N>/ folder, decodes each raw_<ts>.bin into
 an image, and shows them alongside their IMU data.
 
 Usage:
     python view_sweep.py                          # picks the latest section
     python view_sweep.py section_3                # specific section by name
-    python view_sweep.py clarius_sessions/section_3   # or full path
+    python view_sweep.py data/clarius_sessions/section_3   # or full path
 
 Outputs:
     A PNG montage of all frames in the sweep, with IMU quaternion as text.
@@ -25,9 +25,9 @@ import matplotlib.pyplot as plt
 
 def find_section(arg: str | None) -> Path:
     """Pick the section folder to visualize."""
-    root = Path("clarius_sessions")
+    root = Path(__file__).resolve().parents[2] / "data" / "clarius_sessions"
     if not root.exists():
-        print(f"❌ No clarius_sessions/ folder in {Path.cwd()}")
+        print(f"❌ No clarius_sessions/ folder at {root}")
         sys.exit(1)
 
     if arg is None:

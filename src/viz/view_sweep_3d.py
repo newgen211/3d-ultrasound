@@ -30,9 +30,9 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # noqa: F401
 
 
 def find_section(arg: str | None) -> Path:
-    root = Path("clarius_sessions")
+    root = Path(__file__).resolve().parents[2] / "data" / "clarius_sessions"
     if not root.exists():
-        print(f"❌ No clarius_sessions/ folder in {Path.cwd()}")
+        print(f"❌ No clarius_sessions/ folder at {root}")
         sys.exit(1)
     if arg is None:
         sections = sorted(

@@ -8,7 +8,7 @@ robot-driven 3D reconstruction project (Phase 1).
 
 What this saves per sweep:
 
-    clarius_sessions/section_<N>/
+    data/clarius_sessions/section_<N>/
         manifest.json                  - sweep metadata, frame count, settings
         connection.json                - IP, port, host info
         raw_<probe_ts_ns>.bin          - raw polar frame bytes
@@ -35,6 +35,14 @@ from typing import Final, Optional
 # --- load Clarius shared libraries ------------------------------------------
 
 _CWD = Path.cwd()
+# Native libs (libcast + pyclariuscast) live next to this script, regardless of
+# where it's launched from. Captured sessions go to the repo's data/ folder
+# (anchored below), so output lands in the same place no matter the cwd.
+_LIB_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _LIB_DIR.parents[1]          # src/capture/ -> repo root
+DATA = _REPO_ROOT / "data"
+if str(_LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(_LIB_DIR))  # so `import pyclariuscast` resolves here
 
 
 def _load_clarius_libs():
@@ -48,19 +56,19 @@ def _load_clarius_libs():
     else:
         raise RuntimeError(f"Unsupported platform: {sys.platform}")
 
-    libcast_path = _CWD / libcast_name
-    pycast_path = _CWD / "pyclariuscast.so"
+    libcast_path = _LIB_DIR / libcast_name
+    pycast_path = _LIB_DIR / "pyclariuscast.so"
 
     if not libcast_path.exists():
         raise FileNotFoundError(
-            f"Missing {libcast_name} in {_CWD}. "
+            f"Missing {libcast_name} in {_LIB_DIR}. "
             f"Download the matching Cast SDK release from "
             f"https://github.com/clariusdev/cast/releases "
             f"(must match Clarius App version, currently 12.2.x)."
         )
     if not pycast_path.exists() and not sys.platform.startswith("win"):
         raise FileNotFoundError(
-            f"Missing pyclariuscast.so in {_CWD}. "
+            f"Missing pyclariuscast.so in {_LIB_DIR}. "
             f"Get it from the same Cast SDK release that provides {libcast_name}."
         )
 
@@ -216,7 +224,7 @@ class ImageView(QtWidgets.QGraphicsView):
         self.image: Optional[QtGui.QImage] = None
 
         # one session dir per program run; one section folder per scan
-        self.session_root = _CWD / "clarius_sessions"
+        self.session_root = DATA / "clarius_sessions"
         self.session_root.mkdir(parents=True, exist_ok=True)
         self.section_dir = self._next_section_dir()
 
@@ -227,13 +235,17 @@ class ImageView(QtWidgets.QGraphicsView):
         self.scan_timer: Optional[QtCore.QTimer] = None
 
     def _next_section_dir(self) -> Path:
-        existing = [
-            d for d in self.session_root.iterdir()
+        # Use highest existing number + 1 (NOT count + 1): counting breaks when
+        # there are gaps, and could reuse an existing folder and mix two sweeps.
+        nums = [
+            int(d.name.split("_")[1])
+            for d in self.session_root.iterdir()
             if d.is_dir() and d.name.startswith("section_")
+            and d.name.split("_")[1].isdigit()       # handles section_59_cam -> 59
         ]
-        n = len(existing) + 1
+        n = max(nums, default=0) + 1
         d = self.session_root / f"section_{n}"
-        d.mkdir(exist_ok=True)
+        d.mkdir()                                     # n is guaranteed new; no silent reuse
         return d
 
     def updateImage(self, img):
@@ -332,7 +344,7 @@ class ImageView(QtWidgets.QGraphicsView):
         manifest_path = self.section_dir / "manifest.json"
         host_iso, _ = host_iso_now()
         data = {
-            "section_dir": str(self.section_dir.relative_to(_CWD)),
+            "section_dir": str(self.section_dir.relative_to(_REPO_ROOT)),
             "host_time": host_iso,
         }
         data.update(extra)

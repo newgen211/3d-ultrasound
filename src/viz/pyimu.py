@@ -5,8 +5,13 @@ import os.path
 import sys
 from pathlib import Path
 
-libcast_path = os.path.join(os.path.curdir, "libcast.dylib")
-pycast_path = os.path.join(os.path.curdir, "pyclariuscast.so")
+# Native Clarius libs (libcast + pyclariuscast) live in src/capture/; the 3D
+# scanner asset lives next to this script. Anchor both so this runs from any cwd.
+_CAPTURE_DIR = Path(__file__).resolve().parents[1] / "capture"
+_HERE = Path(__file__).resolve().parent
+
+libcast_path = os.path.join(_CAPTURE_DIR, "libcast.dylib")
+pycast_path = os.path.join(_CAPTURE_DIR, "pyclariuscast.so")
 
 assert os.path.exists(libcast_path), f"libcast not found: {libcast_path}"
 assert os.path.exists(pycast_path), f"pycast not found: {pycast_path}"
@@ -115,7 +120,7 @@ class ScannerWindow(Qt3DExtras.Qt3DWindow):
         self.scannerEntity = Qt3DCore.QEntity(self.rootEntity)
         # QSceneLoader loads materials from scanner.mtl referenced in scanner.obj
         self.scanner = Qt3DRender.QSceneLoader(self.scannerEntity)
-        self.scanner.setSource(QUrl.fromLocalFile("scanner.obj"))
+        self.scanner.setSource(QUrl.fromLocalFile(str(_HERE / "scanner.obj")))
         self.scannerEntity.addComponent(self.scanner)
         self.addTransform()
 
