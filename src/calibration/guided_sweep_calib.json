@@ -1,0 +1,16 @@
+{
+  "aruco_dict": "DICT_4X4_50",
+  "marker_size_mm": { "1": 50.0, "2": 50.0, "3": 50.0 },
+  "desk_markers_base_mm": {
+    "1": [116.4, -22.9, 55.1],
+    "2": [115.4, 105.3, 57.6]
+  },
+  "id3_to_scan_start_base_mm": [-118.5, -34.7],
+  "scan_start_z_base_mm": 194.1,
+  "sweep_axis_base": [-0.996, 0.077, -0.040],
+  "sweep_length_mm": 141.0,
+  "waypoint_step_mm": 5.0,
+  "probe_orientation_rxryrz_deg": [73.78, -85.36, 106.53],
+  "id3_expected_yaw_deg": 85.5,
+  "n_frames_average": 30
+}
