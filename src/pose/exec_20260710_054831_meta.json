@@ -1,0 +1,15 @@
+{
+  "source_log": "shifted_sweep.jsonl",
+  "speed": 25,
+  "rate": 1.0,
+  "stride": 1,
+  "mode": "angles",
+  "poses_played": 158,
+  "started": "2026-07-10T05:48:31",
+  "events": {
+    "at_hover": 1783633711216639338,
+    "playback_start": 1783633711218669603,
+    "playback_end": 1783633731732342106
+  },
+  "poses_logged": 263
+}
