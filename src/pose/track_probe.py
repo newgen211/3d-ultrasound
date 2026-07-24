@@ -35,6 +35,7 @@ def geodesic(Ra, Rb):
 
 _h = MARKER_MM / 2.0
 OBJ = np.array([[-_h,_h,0],[_h,_h,0],[_h,-_h,0],[-_h,-_h,0]], dtype=np.float32)
+SUBPIX_CRIT = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 40, 1e-4)
 
 pipe = rs.pipeline()
 cfg = rs.config()
@@ -47,7 +48,18 @@ depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
 intr = profile.get_stream(rs.stream.color).as_video_stream_profile().get_intrinsics()
 K = np.array([[intr.fx,0,intr.ppx],[0,intr.fy,intr.ppy],[0,0,1]], dtype=np.float32)
 dist = np.array(intr.coeffs, dtype=np.float32)
-print(f"Intrinsics fx={intr.fx:.1f} fy={intr.fy:.1f}  depth_scale={depth_scale}")
+_intr_src = "factory"
+for _cand in (_REPO_ROOT / "intrinsics.json", Path("intrinsics.json")):
+    if _cand.exists():
+        _c = json.load(open(_cand))
+        if (_c.get("width"), _c.get("height")) == (WIDTH, HEIGHT):
+            K = np.array(_c["K"], dtype=np.float32)
+            dist = np.array(_c["dist"], dtype=np.float32)
+            _intr_src = f"custom ({_cand.name}, rms {_c.get('rms_px', 0):.2f}px)"
+        else:
+            print(f"!! {_cand} is for {_c.get('width')}x{_c.get('height')} — ignoring")
+        break
+print(f"Intrinsics [{_intr_src}] fx={K[0,0]:.1f} fy={K[1,1]:.1f}  depth_scale={depth_scale}")
 
 adict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
 try:
@@ -100,6 +112,9 @@ try:
         corners, ids, _ = detect(gray)
         seen = {}
         if ids is not None:
+            # sub-pixel corner refinement (A3 experiment #3) — free accuracy
+            for c in corners:
+                cv2.cornerSubPix(gray, c.reshape(-1, 1, 2), (5, 5), (-1, -1), SUBPIX_CRIT)
             for c, i in zip(corners, ids.flatten()):
                 i = int(i)
                 sol = solve_consistent(c[0], prev_R.get(i))

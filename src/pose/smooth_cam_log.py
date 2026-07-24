@@ -27,7 +27,8 @@ for i, r in enumerate(rows):
 for mid, idx in by_id.items():
     C = np.array([rows[i]["coords"] for i in idx], dtype=np.float64)
     T = np.array([rows[i]["t_ns"] for i in idx], dtype=np.float64)
-    rate = max(1.0, len(T) / max((T[-1] - T[0]) / 1e9, 1e-3))
+    import numpy as _np
+    rate = 1.0 / max(float(_np.median(_np.diff(T)) / 1e9), 1e-3)
     w = max(3, int(0.4 * rate))
     Cs = uniform_filter1d(C, size=w, axis=0, mode="nearest")
     for k, i in enumerate(idx):
