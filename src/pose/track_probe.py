@@ -125,7 +125,11 @@ try:
                 rpy = Rotation.from_matrix(R).as_euler("xyz", degrees=True)
                 ctr = c[0].mean(axis=0)
                 dz = depth_at(depth_img, ctr[0], ctr[1], depth_scale)
-                z_fused = dz if dz is not None else float(az)
+                if dz is not None and az > 1.0 and 0.7 < dz/az < 1.3:
+                    s = dz / az
+                    ax, ay, z_fused = ax*s, ay*s, dz     # full 3-axis fusion: PnP bearing x depth range
+                else:
+                    z_fused = dz if dz is not None else float(az)
                 coords = [float(ax), float(ay), z_fused, float(rpy[0]), float(rpy[1]), float(rpy[2])]
                 log.write(json.dumps({"t_ns":t_ns,"id":i,"coords":coords,
                                       "aruco_z":float(az),"depth_z":dz})+"\n")
