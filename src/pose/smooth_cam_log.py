@@ -25,6 +25,9 @@ for i, r in enumerate(rows):
         by_id.setdefault(r.get("id"), []).append(i)
 
 for mid, idx in by_id.items():
+    if len(idx) < 5:
+        print(f'id{mid}: {len(idx)} poses — too few, left raw')
+        continue
     C = np.array([rows[i]["coords"] for i in idx], dtype=np.float64)
     T = np.array([rows[i]["t_ns"] for i in idx], dtype=np.float64)
     import numpy as _np

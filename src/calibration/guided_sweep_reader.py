@@ -253,6 +253,17 @@ def main():
     s, R, t, resid = camera_to_base(p1c, p2c, n_c, p1b, p2b)
     print(f"camera->base solved (similarity), internal residual {resid:.2f} mm")
 
+    # persist the fresh similarity for downstream tools (point cloud, sim).
+    # Convention: p_base = s * R @ p_cam + t   (identical to to_base below)
+    import os
+    c2b_path = os.path.join(os.path.dirname(os.path.abspath(args.calib)),
+                            "cam_to_base.json")
+    with open(c2b_path, "w") as f:
+        json.dump({"s": float(s), "R": R.tolist(), "t": t.tolist(),
+                   "residual_mm": float(resid),
+                   "solved": time.strftime("%Y-%m-%d %H:%M:%S")}, f, indent=2)
+    print(f"cam->base saved: {c2b_path}")
+
     to_base = lambda pc: R @ (s * pc) + t
 
     # id3 -> phantom anchor (position only; container never rotates)

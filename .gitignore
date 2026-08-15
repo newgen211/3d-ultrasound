@@ -50,5 +50,20 @@ tls.crt
 # Large / regenerable data (kept locally, not committed)
 data/
 media/
+runs/
+yolo_ds/
+*.ply
+*.npz
+sim_handoff.zip
 
-# Note: handeye.json (calibration result) and outputs/ are intentionally tracked.
+# Audit: frames are regenerable, TRUTH IS NOT — carve it out
+audit/*
+!audit/audit_truth.json
+!audit/audit_manifest.json
+
+# Pose/exec logs are data, but launch + teach files are work products — keep them
+pose_logs/exec_*
+!pose_logs/sweep_teach_*.jsonl
+!pose_logs/shifted_*.jsonl
+
+# Note: handeye.json, calibration jsons, exemplars.json, outputs/ intentionally tracked.

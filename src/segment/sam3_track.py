@@ -14,12 +14,18 @@ Fixes over the first exemplar run:
   3. STORE SAM's REAL BOX (out_boxes_xywh) per detection so the overlay can draw
      the actual detection instead of a synthesized circle (lets us judge the true
      lateral extent, which beam-spread blooms).
+  4. EXEMPLAR CARRY-FORWARD. When the classical detector finds no clean seed on
+     a frame (2/3 of section_85!), reuse the last good exemplar box for up to
+     CARRY_MAX frames. Vessels barely move frame-to-frame at rate 2, so the box
+     stays valid; SAM still segments the ACTUAL pixels of each frame and every
+     output guard still applies — a stale box that points at nothing simply
+     returns nothing (fail-quiet, never fail-wrong).
 
 Note on radius: r_mm = ellipse MINOR axis = the AXIAL (vertical) dimension, which
 is the trustworthy one. Lateral width is partly real, partly beam-spread artifact;
 the stored sam_box lets you see SAM's actual extent and decide.
 
-    python3 sam3_track.py section_59 --checkpoint ~/ckpt_sam3/sam3.pt --keep-jpg
+    python3 sam3_track.py section_85 --checkpoint ~/ckpt_sam3/sam3.pt --keep-jpg
 
 Box prompts go in NORMALIZED [0,1] xywh (SAM asserts this). Points were pixels —
 inconsistent, but that's the API.
@@ -40,6 +46,10 @@ from segment_tube import find_section, load_frame, to_u8, candidates
 MAX_EXEMPLAR_R_MM = 2.5    # exemplar must be a small clean vessel, not the dark band
 MAX_VESSEL_R_MM   = 3.5    # drop output detections bigger than a real vessel (~6 mm dia)
 EDGE_MARGIN_FRAC  = 0.06   # reject anything whose centroid is within this frac of the L/R edge
+CARRY_MAX         = 30     # frames a stale exemplar may survive without a fresh detection
+PROB_MIN          = 0.5    # SAM confidence gate: junk speckle matches score low
+DARK_FRAC         = 0.75   # vessel lumens are anechoic: mask interior must be darker
+                           # than DARK_FRAC * frame median, or it's speckle, not lumen
 
 
 def decode_frames(section, jpg_dir):
@@ -134,6 +144,10 @@ def main():
     detections = []
     skipped_no_exemplar = 0
     dropped_guard = 0
+    carried = 0
+    dropped_prob = 0
+    dropped_dark = 0
+    last_box, carry_age = None, 0
     printed = False
     for i, (jp, axial, lateral, shape) in enumerate(meta_per_frame):
         if shape is None:
@@ -141,8 +155,15 @@ def main():
         H, W = shape
         box = exemplar_box(jp, axial, lateral, H, W)
         if box is None:
-            skipped_no_exemplar += 1
-            continue
+            if last_box is not None and carry_age < CARRY_MAX:
+                box = last_box
+                carry_age += 1
+                carried += 1
+            else:
+                skipped_no_exemplar += 1
+                continue
+        else:
+            last_box, carry_age = box, 0
 
         predictor.handle_request(request=dict(type="reset_session", session_id=session_id))
         resp = predictor.handle_request(request=dict(
@@ -152,6 +173,9 @@ def main():
         out = resp.get("outputs", {}) if isinstance(resp, dict) else {}
         masks = out.get("out_binary_masks")
         sam_boxes = out.get("out_boxes_xywh")
+        probs = out.get("out_probs")
+        gray = cv2.imread(str(jpg_dir / f"{i:05d}.jpg"), cv2.IMREAD_GRAYSCALE)
+        frame_med = float(np.median(gray)) if gray is not None else None
         if masks is None:
             if not printed:
                 print(f"  [frame {i}] no masks; keys={list(out.keys())}")
@@ -172,13 +196,27 @@ def main():
             if (np.isfinite(r_mm) and r_mm > MAX_VESSEL_R_MM) or not (lo <= cx <= hi):
                 dropped_guard += 1
                 continue
+            # CONFIDENCE GATE — junk speckle matches score low
+            if probs is not None and k < len(probs) and float(probs[k]) < PROB_MIN:
+                dropped_prob += 1
+                continue
+            # DARKNESS GATE — a vessel lumen is anechoic; speckle holes are not
+            if frame_med is not None and frame_med > 0:
+                mm_ = (np.asarray(mask) > 0).squeeze()
+                if mm_.ndim == 2 and mm_.sum() >= 10:
+                    if float(gray[mm_].mean()) > DARK_FRAC * frame_med:
+                        dropped_dark += 1
+                        continue
             sb = None
             if sam_boxes is not None and k < len(sam_boxes):
                 b = sam_boxes[k]
                 sb = [float(v) for v in (b.tolist() if hasattr(b, "tolist") else b)]
             detections.append(dict(frame_index=i, stem=jp.stem, inst=k,
                                    cx=cx, cy=cy, cx_mm=cx_mm,
-                                   depth_mm=depth_mm, r_mm=r_mm, sam_box=sb))
+                                   depth_mm=depth_mm, r_mm=r_mm, sam_box=sb,
+                                   carried=bool(carry_age > 0),
+                                   prob=(float(probs[k]) if probs is not None
+                                         and k < len(probs) else None)))
 
     predictor.handle_request(request=dict(type="close_session", session_id=session_id))
 
@@ -187,7 +225,9 @@ def main():
                  for f in {d["frame_index"] for d in detections}]
     rr = np.array([d["r_mm"] for d in detections if np.isfinite(d["r_mm"])])
     print(f"\n{len(detections)} detections across {frames_with}/{n} frames "
-          f"(skipped {skipped_no_exemplar} no-exemplar, dropped {dropped_guard} by guard)")
+          f"(skipped {skipped_no_exemplar} no-exemplar, carried {carried}, "
+          f"dropped {dropped_guard} guard / {dropped_prob} low-prob / "
+          f"{dropped_dark} not-dark)")
     if per_frame:
         print(f"instances per frame: median {int(np.median(per_frame))}, max {max(per_frame)}")
     if rr.size:
