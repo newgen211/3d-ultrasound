@@ -49,11 +49,15 @@ tls.crt
 
 # Large / regenerable data (kept locally, not committed)
 data/
-media/
+# paper figures tracked; other media (ply/npz) stay ignored
+media/*
+!media/*.png
 runs/
 yolo_ds/
 *.ply
 *.npz
+# handoff/ is a curated pull-point — track its point cloud
+!handoff/*.ply
 sim_handoff.zip
 
 # Audit: frames are regenerable, TRUTH IS NOT — carve it out
@@ -66,4 +70,6 @@ pose_logs/exec_*
 !pose_logs/sweep_teach_*.jsonl
 !pose_logs/shifted_*.jsonl
 
-# Note: handeye.json, calibration jsons, exemplars.json, outputs/ intentionally tracked.
+# Note: calib/ (hand-eye, bridge, intrinsics, urdf), exemplars.json, handoff/, outputs/
+# are intentionally tracked. data/pose_logs/README.md is force-tracked (git add -f);
+# the rest of data/ stays ignored.
