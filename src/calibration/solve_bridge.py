@@ -53,11 +53,9 @@ def main():
     # from joints, no euler decomposition, gimbal lock has nothing to break.
     fk_rots = None
     if np.isfinite(Ap).all() and np.nanstd(Ap) > 1.0:
-        for u in ("mycobot_320_pi.urdf",
+        for u in ("calib/mycobot_320_pi.urdf",
                   os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "mycobot_320_pi.urdf"),
-                  os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "..", "..", "mycobot_320_pi.urdf")):
+                               "..", "..", "calib", "mycobot_320_pi.urdf")):
             if os.path.exists(u):
                 import warnings; warnings.filterwarnings("ignore")
                 from ikpy.chain import Chain
@@ -331,8 +329,8 @@ def main():
                "pairs_used": len(kept), "orientation_spread_deg": float(div),
                "median_err_mm": float(np.median(errs)),
                "rms_err_mm": float(np.sqrt((errs**2).mean()))},
-              open("bridge.json", "w"), indent=2)
-    print("wrote bridge.json")
+              open("calib/bridge.json", "w"), indent=2)
+    print("wrote calib/bridge.json")
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

@@ -171,6 +171,6 @@ out = {"width": 640, "height": 480,
        "K": K.tolist(), "dist": dist.ravel().tolist(),
        "rms_px": float(rms), "n_views": len(objpoints),
        "square_mm": SQUARE_MM, "captured": time.strftime("%Y-%m-%d %H:%M:%S")}
-with open("intrinsics.json", "w") as f:
+with open("calib/intrinsics.json", "w") as f:
     json.dump(out, f, indent=2)
-print("wrote intrinsics.json — track_probe loads this when present.")
+print("wrote calib/intrinsics.json — track_probe loads this when present.")

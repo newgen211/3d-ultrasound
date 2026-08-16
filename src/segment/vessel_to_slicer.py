@@ -75,7 +75,7 @@ def write_mrk_curve(path, C, radius):
 def main():
     section = find_section(sys.argv[1] if len(sys.argv) > 1 else None)
     he = None
-    for c in [section / "handeye.json", _REPO_ROOT / "handeye.json"]:
+    for c in [section / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]:
         if c.exists():
             he = json.loads(c.read_text()); break
     if he is None:

@@ -70,7 +70,7 @@ def main():
     print(f"📂 {len(detections)} detections from {det_path}")
 
     # hand-eye
-    cands = [Path(args.handeye)] if args.handeye else [section / "handeye.json", Path("handeye.json")]
+    cands = [Path(args.handeye)] if args.handeye else [section / "handeye.json", Path("calib/handeye.json")]
     he = None
     for c in cands:
         if c and c.exists():

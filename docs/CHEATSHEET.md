@@ -34,7 +34,7 @@ python src/pose/trim_section.py section_<N> <exec.jsonl> <meta.json> data/pose_l
 #   check: offset ~0.0s, lag ~ your --delay, keep count sane  ->  rerun --apply
 python smooth_cam_log.py data/pose_logs/sec<N>_cam.jsonl data/pose_logs/sec<N>_cam_smooth.jsonl
 python src/pose/merge_poses_cam.py section_<N> data/pose_logs/sec<N>_cam_smooth.jsonl
-python src/reconstruct/reconstruct_handeye.py section_<N>       # uses root handeye.json = section_60's 2.20mm
+python src/reconstruct/reconstruct_handeye.py section_<N>       # uses calib/handeye.json = section_60's 2.20mm
 # drift audit (expect <1mm taped): id3-during-capture one-liner (handoff 07-09)
 ```
 
@@ -77,4 +77,4 @@ python3 touch_calib.py                    # Pi; gimbal-safe version
 | `merge_poses_cam.py` | camera poses -> frame sidecars |
 | `reconstruct_handeye.py` | posed frames -> volume + MIPs |
 | `sweep_teach*.jsonl` | the taught skill(s) — permanent assets |
-| `handeye.json` (root) | = section_60's 2.20 mm (keep it so) |
+| `calib/handeye.json` | = section_60's 2.20 mm (keep it so) |

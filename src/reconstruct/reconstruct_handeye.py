@@ -166,7 +166,7 @@ def main():
     section = find_section(args.section)
 
     # ---- locate handeye.json ----
-    cands = [Path(args.handeye)] if args.handeye else [section / "handeye.json", _REPO_ROOT / "handeye.json"]
+    cands = [Path(args.handeye)] if args.handeye else [section / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]
     he, he_path = None, None
     for c in cands:
         if c and c.exists():

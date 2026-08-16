@@ -167,7 +167,7 @@ def main():
 
     sections = [resolve_section(s) for s in args.sections]
 
-    cands = [Path(args.handeye)] if args.handeye else [sections[0] / "handeye.json", _REPO_ROOT / "handeye.json"]
+    cands = [Path(args.handeye)] if args.handeye else [sections[0] / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]
     he, he_path = None, None
     for c in cands:
         if c and c.exists():

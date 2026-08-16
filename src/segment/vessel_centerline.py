@@ -45,7 +45,7 @@ def main():
 
     # hand-eye
     he = None
-    for c in [section / "handeye.json", _REPO_ROOT / "handeye.json"]:
+    for c in [section / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]:
         if c.exists():
             he = json.loads(c.read_text()); break
     if he is None:

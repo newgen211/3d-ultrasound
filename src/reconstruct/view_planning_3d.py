@@ -72,7 +72,7 @@ def main():
         det_path = alt if alt.exists() else det_path
     detections = json.loads(det_path.read_text())["detections"]
 
-    cands = [Path(args.handeye)] if args.handeye else [section / "handeye.json", Path("handeye.json")]
+    cands = [Path(args.handeye)] if args.handeye else [section / "handeye.json", Path("calib/handeye.json")]
     he = next((json.loads(c.read_text()) for c in cands if c and c.exists()), None)
     if he is None:
         sys.exit("no handeye.json")

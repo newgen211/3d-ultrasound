@@ -49,7 +49,7 @@ intr = profile.get_stream(rs.stream.color).as_video_stream_profile().get_intrins
 K = np.array([[intr.fx,0,intr.ppx],[0,intr.fy,intr.ppy],[0,0,1]], dtype=np.float32)
 dist = np.array(intr.coeffs, dtype=np.float32)
 _intr_src = "factory"
-for _cand in (_REPO_ROOT / "intrinsics.json", Path("intrinsics.json")):
+for _cand in (_REPO_ROOT / "calib" / "intrinsics.json", Path("calib/intrinsics.json")):
     if _cand.exists():
         _c = json.load(open(_cand))
         if (_c.get("width"), _c.get("height")) == (WIDTH, HEIGHT):

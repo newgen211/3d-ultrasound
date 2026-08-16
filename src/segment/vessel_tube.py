@@ -134,7 +134,7 @@ def main():
     section = find_section(pos_args[0] if pos_args else None)
 
     he = None
-    for c in [section / "handeye.json", _REPO_ROOT / "handeye.json"]:
+    for c in [section / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]:
         if c.exists():
             he = json.loads(c.read_text()); break
     if he is None:
