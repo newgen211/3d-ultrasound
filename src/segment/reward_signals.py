@@ -7,7 +7,7 @@ sim/training loop and the live controller on the real arm, so the policy
 never sees a different signal at deployment than it trained on.
 
     from reward_signals import RewardSignals
-    rs = RewardSignals(model="best_regated.pt")
+    rs = RewardSignals(model="models/best_regated.pt")
     out = rs.update(gray_frame, axial_mm=0.0513, lateral_mm=0.130)
     # -> dict(centered=..., visible=..., patency=..., coupling=...,
     #         n_vessels=..., tracked=bool)
@@ -57,7 +57,7 @@ class _Track:
 
 
 class RewardSignals:
-    def __init__(self, model="best_regated.pt", conf=0.25,
+    def __init__(self, model="models/best_regated.pt", conf=0.25,
                  baseline_aspect=BASELINE_ASPECT, device=None):
         from ultralytics import YOLO
         self.model = YOLO(model)

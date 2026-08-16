@@ -5,7 +5,7 @@ frame, exactly as a live controller would see it. Lets the RL side inspect
 the reward traces with zero hardware.
 
     python3 demo_replay.py section_85
-    python3 demo_replay.py section_81 --model best_regated.pt --csv
+    python3 demo_replay.py section_81 --model models/best_regated.pt --csv
 
 Writes <section>/reward_trace.png (+ optional reward_trace.csv).
 Sanity expectations: section_85 (autonomous, over-pressed) should show
@@ -28,7 +28,7 @@ from reward_signals import RewardSignals, combine
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("section")
-    ap.add_argument("--model", default="best_regated.pt")
+    ap.add_argument("--model", default="models/best_regated.pt")
     ap.add_argument("--conf", type=float, default=0.25)
     ap.add_argument("--csv", action="store_true")
     args = ap.parse_args()
