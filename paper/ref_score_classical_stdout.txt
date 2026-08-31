@@ -1,0 +1,32 @@
+
+== classical AS-IS ==  P 0.229  R 0.256  F1 0.242  (tp 53 fp 178 fn 154)
+  section_103  P 0.00  R 0.00   (tp 0 fp 27 fn 13)
+  section_104  P 0.12  R 0.08   (tp 3 fp 23 fn 36)
+  section_62   P 0.49  R 0.56   (tp 23 fp 24 fn 18)
+  section_81   P 0.39  R 0.36   (tp 16 fp 25 fn 29)
+  section_85   P 0.47  R 0.35   (tp 9 fp 10 fn 17)
+  section_90   P 0.00  R 0.00   (tp 0 fp 19 fn 5)
+  section_92   P 0.00  R 0.00   (tp 0 fp 25 fn 21)
+  section_94   P 0.07  R 0.12   (tp 2 fp 25 fn 15)
+
+== classical NO-CROP ==  P 0.218  R 0.208  F1 0.213  (tp 43 fp 154 fn 164)
+  section_103  P 0.00  R 0.00   (tp 0 fp 25 fn 13)
+  section_104  P 0.09  R 0.05   (tp 2 fp 20 fn 37)
+  section_62   P 0.50  R 0.56   (tp 23 fp 23 fn 18)
+  section_81   P 0.50  R 0.22   (tp 10 fp 10 fn 35)
+  section_85   P 0.45  R 0.19   (tp 5 fp 6 fn 21)
+  section_90   P 0.00  R 0.00   (tp 0 fp 16 fn 5)
+  section_92   P 0.00  R 0.00   (tp 0 fp 30 fn 21)
+  section_94   P 0.11  R 0.18   (tp 3 fp 24 fn 14)
+
+truth vessel depths (ALL morphs): n=376  above 3.0mm: 0 (0%)  p10 6.5  med 7.3  p90 12.6 mm
+
+== student best_regated @0.25 (jpg) ==  P 0.913  R 0.507  F1 0.652  (tp 105 fp 10 fn 102)
+  section_103  P 0.00  R 0.00   (tp 0 fp 1 fn 13)
+  section_104  P 1.00  R 0.28   (tp 11 fp 0 fn 28)
+  section_62   P 0.93  R 0.93   (tp 38 fp 3 fn 3)
+  section_81   P 0.89  R 0.87   (tp 39 fp 5 fn 6)
+  section_85   P 0.92  R 0.46   (tp 12 fp 1 fn 14)
+  section_90   P 0.00  R 0.00   (tp 0 fp 0 fn 5)
+  section_92   P 0.00  R 0.00   (tp 0 fp 0 fn 21)
+  section_94   P 1.00  R 0.29   (tp 5 fp 0 fn 12)

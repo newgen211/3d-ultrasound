@@ -1,0 +1,4 @@
+best_regated   P 0.913  R 0.507  F1 0.652  (tp 105 fp 10 fn 102)
+bench_s        P 0.874  R 0.536  F1 0.665  (tp 111 fp 16 fn 96)
+bench_m        P 0.896  R 0.541  F1 0.675  (tp 112 fp 13 fn 95)
+gold_n         P 0.749  R 0.633  F1 0.686  (tp 131 fp 44 fn 76)
