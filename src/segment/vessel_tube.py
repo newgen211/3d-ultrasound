@@ -213,6 +213,10 @@ def main():
     idx = np.linspace(0, len(C) - 1, min(TUBE_PTS, len(C))).astype(int)
     Cs = smooth_seq(C[idx], 2)
     Rs = np.maximum(0.4, smooth_seq(crad[idx].reshape(-1, 1), 2).ravel())
+    (Path(section) / "centerline.json").write_text(json.dumps({
+        "centerline_mm": Cs.tolist(), "radii_mm": Rs.tolist(),
+        "length_mm": length, "spread_mm": spread,
+        "n_points": int(keep.sum()), "straightened": bool(straighten)}))
     X, Y, Z = tube_mesh(Cs, Rs)
 
     fig = plt.figure(figsize=(11, 7))

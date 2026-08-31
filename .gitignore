@@ -73,3 +73,22 @@ pose_logs/exec_*
 # Note: calib/ (hand-eye, bridge, intrinsics, urdf), exemplars.json, handoff/, outputs/
 # are intentionally tracked. data/pose_logs/README.md is force-tracked (git add -f);
 # the rest of data/ stays ignored.
+# --- additions Aug 31: gold-label sprint + gauge/E5 era ---
+overlays/
+attic/
+models/
+*.pt
+*.mp4
+*.avi
+
+# gold datasets: images regenerate from sections; HUMAN LABELS DO NOT — carve them out
+yolo_ds_gold/
+yolo_ds_human/*
+!yolo_ds_human/labels
+!yolo_ds_human/labels/**
+
+# generated visuals at repo root (regenerable from scripts)
+viz_*.png
+diag_left*.png
+preset_compare.png
+borderline_sheet.png
