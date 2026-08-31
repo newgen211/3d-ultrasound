@@ -57,3 +57,4 @@ attic/                  superseded bundles / one-offs — kept, never deleted
 docs/                   CHEATSHEET + plans + references
 ultrasound-cobot/       SEPARATE git repo — Raspberry-Pi arm scripts
 ```
+audit/audit_truth.json is canonical; handoff/ is a curated snapshot.
