@@ -19,68 +19,28 @@ Run:
     python3 pysidecaster.py             # macOS / Linux
     LD_LIBRARY_PATH=. python3 pysidecaster.py    # if Linux can't find libcast.so
 
-Requires libcast.{so,dylib,dll} + pyclariuscast.so in the working directory.
+Requires libcast.{so,dylib,dll} + pyclariuscast.so beside cast_capture.py.
 """
 
 import ctypes
 import json
-import os
 import sys
-import threading
-import time
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Final, Optional
 
-# --- load Clarius shared libraries ------------------------------------------
-
-_CWD = Path.cwd()
 # Native libs (libcast + pyclariuscast) live next to this script, regardless of
 # where it's launched from. Captured sessions go to the repo's data/ folder
 # (anchored below), so output lands in the same place no matter the cwd.
+_CWD = Path.cwd()
 _LIB_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _LIB_DIR.parents[1]          # src/capture/ -> repo root
 DATA = _REPO_ROOT / "data"
 if str(_LIB_DIR) not in sys.path:
-    sys.path.insert(0, str(_LIB_DIR))  # so `import pyclariuscast` resolves here
+    sys.path.insert(0, str(_LIB_DIR))
 
-
-def _load_clarius_libs():
-    """Load libcast and pyclariuscast, with a useful error if they're missing."""
-    if sys.platform.startswith("linux"):
-        libcast_name = "libcast.so"
-    elif sys.platform.startswith("darwin"):
-        libcast_name = "libcast.dylib"
-    elif sys.platform.startswith("win"):
-        libcast_name = "cast.dll"
-    else:
-        raise RuntimeError(f"Unsupported platform: {sys.platform}")
-
-    libcast_path = _LIB_DIR / libcast_name
-    pycast_path = _LIB_DIR / "pyclariuscast.so"
-
-    if not libcast_path.exists():
-        raise FileNotFoundError(
-            f"Missing {libcast_name} in {_LIB_DIR}. "
-            f"Download the matching Cast SDK release from "
-            f"https://github.com/clariusdev/cast/releases "
-            f"(must match Clarius App version, currently 12.2.x)."
-        )
-    if not pycast_path.exists() and not sys.platform.startswith("win"):
-        raise FileNotFoundError(
-            f"Missing pyclariuscast.so in {_LIB_DIR}. "
-            f"Get it from the same Cast SDK release that provides {libcast_name}."
-        )
-
-    handle = ctypes.CDLL(str(libcast_path), ctypes.RTLD_GLOBAL)._handle
-    if not sys.platform.startswith("win"):
-        ctypes.cdll.LoadLibrary(str(pycast_path))
-    return handle
-
-
-libcast_handle = _load_clarius_libs()
-
-import pyclariuscast  # noqa: E402
+# The capture core (library loading, SDK callbacks, frame store, on-disk format)
+# is shared with cast_headless.py so there is exactly one save path.
+from cast_capture import Session, host_now, libcast_handle, make_caster, store  # noqa: E402
 from PySide6 import QtCore, QtGui, QtWidgets  # noqa: E402
 from PySide6.QtCore import Qt, Slot  # noqa: E402
 
@@ -100,71 +60,6 @@ CMD_CFI_MODE: Final = 14
 
 # remembered connection prefs
 PREFS_PATH = Path.home() / ".clarius_last_connect.json"
-
-
-# --- thread-safe shared state between callbacks and UI ----------------------
-
-
-class FrameStore:
-    """
-    The SDK calls newProcessedImage / newRawImage on its own threads.
-    The UI reads them from the Qt event loop. Wrap shared state in a lock.
-    """
-
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._last_raw = None
-        self._last_processed_ts = None
-        self._last_imu = None  # list of dicts from most recent processed frame
-
-    def set_raw(self, raw_dict):
-        with self._lock:
-            self._last_raw = raw_dict
-
-    def get_raw(self):
-        with self._lock:
-            return self._last_raw
-
-    def set_processed(self, timestamp_ns, imu_samples):
-        with self._lock:
-            self._last_processed_ts = timestamp_ns
-            self._last_imu = imu_samples
-
-    def get_processed(self):
-        with self._lock:
-            return self._last_processed_ts, self._last_imu
-
-
-store = FrameStore()
-
-
-# --- helpers ----------------------------------------------------------------
-
-
-def host_iso_now():
-    """Host wall-clock timestamp as ISO 8601 UTC string + ns int."""
-    now = datetime.now(timezone.utc)
-    return now.isoformat(), time.time_ns()
-
-
-def imu_sample_to_dict(s):
-    """Convert a ClariusPosInfo sample into a plain dict for JSON."""
-    return {
-        "tm": getattr(s, "tm", None),
-        "gx": getattr(s, "gx", None),
-        "gy": getattr(s, "gy", None),
-        "gz": getattr(s, "gz", None),
-        "ax": getattr(s, "ax", None),
-        "ay": getattr(s, "ay", None),
-        "az": getattr(s, "az", None),
-        "mx": getattr(s, "mx", None),
-        "my": getattr(s, "my", None),
-        "mz": getattr(s, "mz", None),
-        "qw": getattr(s, "qw", None),
-        "qx": getattr(s, "qx", None),
-        "qy": getattr(s, "qy", None),
-        "qz": getattr(s, "qz", None),
-    }
 
 
 # --- Qt event plumbing ------------------------------------------------------
@@ -223,30 +118,22 @@ class ImageView(QtWidgets.QGraphicsView):
         self.setScene(QtWidgets.QGraphicsScene())
         self.image: Optional[QtGui.QImage] = None
 
-        # one session dir per program run; one section folder per scan
+        # one session dir per program run; a new one per Start Scan.
+        # Session picks highest existing number + 1, so no folder is ever reused.
         self.session_root = DATA / "clarius_sessions"
-        self.session_root.mkdir(parents=True, exist_ok=True)
-        self.section_dir = self._next_section_dir()
+        self.session = Session(root=self.session_root, base=_REPO_ROOT)
 
         # sweep tracking
         self.sweep_active = False
-        self.sweep_start_host_ns: Optional[int] = None
-        self.sweep_frame_count = 0
         self.scan_timer: Optional[QtCore.QTimer] = None
 
-    def _next_section_dir(self) -> Path:
-        # Use highest existing number + 1 (NOT count + 1): counting breaks when
-        # there are gaps, and could reuse an existing folder and mix two sweeps.
-        nums = [
-            int(d.name.split("_")[1])
-            for d in self.session_root.iterdir()
-            if d.is_dir() and d.name.startswith("section_")
-            and d.name.split("_")[1].isdigit()       # handles section_59_cam -> 59
-        ]
-        n = max(nums, default=0) + 1
-        d = self.session_root / f"section_{n}"
-        d.mkdir()                                     # n is guaranteed new; no silent reuse
-        return d
+    @property
+    def section_dir(self) -> Path:
+        return self.session.dir
+
+    @property
+    def sweep_frame_count(self) -> int:
+        return self.session.frames
 
     def updateImage(self, img):
         self.image = img
@@ -254,7 +141,7 @@ class ImageView(QtWidgets.QGraphicsView):
 
     def saveProcessedImage(self) -> Optional[Path]:
         """Save the scan-converted display image as PNG."""
-        ts, _ = store.get_processed()
+        _, ts, _ = store.snapshot()
         if ts is None:
             return None
         if self.image is None:
@@ -266,48 +153,13 @@ class ImageView(QtWidgets.QGraphicsView):
     def saveRawFrame(self) -> Optional[Path]:
         """
         Save the most recent raw frame as .bin + sidecar .json including IMU.
-        Called both on demand (button) and from the sweep timer.
+        Called both on demand (button) and from the sweep timer. force=True keeps
+        the GUI's every-tick behaviour: a repeated frame is rewritten, not skipped.
         """
-        raw = store.get_raw()
-        if raw is None:
+        ts = self.session.save_frame(force=True)
+        if ts is None:
             return None
-
-        ts = raw["timestamp"]
-        bin_path = self.section_dir / f"raw_{ts}.bin"
-        meta_path = self.section_dir / f"raw_{ts}.json"
-
-        # 1) raw bytes
-        with open(bin_path, "wb") as f:
-            f.write(raw["image"])
-
-        # 2) sidecar JSON: frame metadata + IMU + host clock
-        host_iso, host_ns = host_iso_now()
-        proc_ts, imu_samples = store.get_processed()
-        meta = {
-            "probe_timestamp_ns": ts,
-            "host_timestamp_iso": host_iso,
-            "host_timestamp_ns": host_ns,
-            "frame": {
-                "lines": raw["lines"],
-                "samples": raw["samples"],
-                "bps": raw["bps"],
-                "axial_um_per_sample": raw["axial"],
-                "lateral_um_per_line": raw["lateral"],
-                "angle": raw["angle"],
-                "jpg_size": raw["jpg"],
-                "is_rf": bool(raw["rf"]),
-            },
-            "last_processed_probe_ts_ns": proc_ts,
-            "imu_samples": imu_samples or [],
-            "imu_sample_count": len(imu_samples) if imu_samples else 0,
-        }
-        with open(meta_path, "w") as f:
-            json.dump(meta, f, indent=2)
-
-        if self.sweep_active:
-            self.sweep_frame_count += 1
-
-        return bin_path
+        return self.section_dir / f"raw_{ts}.bin"
 
     # --- sweep control ------------------------------------------------------
 
@@ -315,11 +167,9 @@ class ImageView(QtWidgets.QGraphicsView):
         if self.sweep_active:
             return
         # always start a new section on each Start Scan press so we don't mix sweeps
-        self.section_dir = self._next_section_dir()
+        self.session = Session(root=self.session_root, base=_REPO_ROOT)
         self.sweep_active = True
-        self.sweep_start_host_ns = time.time_ns()
-        self.sweep_frame_count = 0
-        self._write_manifest(state="started", interval_ms=interval_ms)
+        self.session.start(interval_ms)
 
         self.scan_timer = QtCore.QTimer(self)
         self.scan_timer.timeout.connect(self.saveRawFrame)
@@ -332,32 +182,7 @@ class ImageView(QtWidgets.QGraphicsView):
             self.scan_timer.stop()
             self.scan_timer = None
         self.sweep_active = False
-        duration_s = (time.time_ns() - (self.sweep_start_host_ns or 0)) / 1e9
-        summary = {
-            "frames": self.sweep_frame_count,
-            "duration_s": round(duration_s, 2),
-        }
-        self._write_manifest(state="stopped", **summary)
-        return summary
-
-    def _write_manifest(self, **extra):
-        manifest_path = self.section_dir / "manifest.json"
-        host_iso, _ = host_iso_now()
-        data = {
-            "section_dir": str(self.section_dir.relative_to(_REPO_ROOT)),
-            "host_time": host_iso,
-        }
-        data.update(extra)
-        # merge with existing if any
-        if manifest_path.exists():
-            try:
-                old = json.loads(manifest_path.read_text())
-                old.update(data)
-                data = old
-            except json.JSONDecodeError:
-                pass
-        with open(manifest_path, "w") as f:
-            json.dump(data, f, indent=2)
+        return self.session.stop()
 
     # --- rendering ----------------------------------------------------------
 
@@ -541,15 +366,7 @@ class MainWidget(QtWidgets.QMainWindow):
             self.statusBar().showMessage("Not connected")
 
     def _write_connection_info(self, ip: str, port: int):
-        info = {
-            "ip": ip,
-            "port": port,
-            "platform": sys.platform,
-            "host_time": host_iso_now()[0],
-        }
-        (self.img.section_dir / "connection.json").write_text(
-            json.dumps(info, indent=2)
-        )
+        self.img.session.write_connection(ip, port)
 
     # ---- scan capture -------------------------------------------------------
 
@@ -626,51 +443,21 @@ class MainWidget(QtWidgets.QMainWindow):
         QtWidgets.QApplication.quit()
 
 
-# --- SDK callbacks (run on background threads — keep them fast) -------------
+# --- SDK callbacks (run on background threads, keep them fast) -------------
+# The raw-frame and IMU bookkeeping live in cast_capture; only the display path
+# and the two Qt relays are the GUI's own.
 
 
-def newProcessedImage(image, width, height, sz, micronsPerPixel,
-                      timestamp, angle, imu):
-    """Display frame + per-frame IMU. Bundle IMU into the FrameStore."""
+def on_image(image, width, height, sz, micronsPerPixel, timestamp, angle):
+    """Display frame. The IMU that came with it is already in the store."""
     bpp = sz / (width * height)
     if bpp == 4:
         img = QtGui.QImage(image, width, height, QtGui.QImage.Format_ARGB32)
     else:
         img = QtGui.QImage(image, width, height, QtGui.QImage.Format_Grayscale8)
-    # deep copy — the SDK's image buffer is invalid after this returns
+    # deep copy: the SDK's image buffer is invalid after this returns
     signaller.usimage = img.copy()
-
-    imu_dicts = [imu_sample_to_dict(s) for s in imu] if imu else []
-    store.set_processed(timestamp, imu_dicts)
-
     QtCore.QCoreApplication.postEvent(signaller, ImageEvent())
-
-
-def newRawImage(image, lines, samples, bps, axial, lateral, timestamp,
-                jpg, rf, angle):
-    """Pre-scan-conversion polar frame. Push into the FrameStore for later save."""
-    store.set_raw({
-        "image": bytes(image[:]),
-        "lines": lines,
-        "samples": samples,
-        "bps": bps,
-        "axial": axial,
-        "lateral": lateral,
-        "timestamp": timestamp,
-        "jpg": jpg,
-        "rf": rf,
-        "angle": angle,
-    })
-
-
-def newSpectrumImage(image, lines, samples, bps, period,
-                     micronsPerSample, velocityPerSample, pw):
-    return
-
-
-def newImuData(imu):
-    # not used — we get IMU bundled with frames in newProcessedImage
-    return
 
 
 def freezeFn(frozen):
@@ -685,14 +472,7 @@ def buttonsFn(button, clicks):
 
 
 def main():
-    cast = pyclariuscast.Caster(
-        newProcessedImage,
-        newRawImage,
-        newSpectrumImage,
-        newImuData,
-        freezeFn,
-        buttonsFn,
-    )
+    cast = make_caster(on_image=on_image, on_freeze=freezeFn, on_button=buttonsFn)
     app = QtWidgets.QApplication(sys.argv)
     win = MainWidget(cast)
     win.resize(900, 700)
