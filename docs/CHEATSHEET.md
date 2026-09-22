@@ -25,10 +25,12 @@ make clean-stamps SEC=<N>           # force trim + merge to rerun
 #   trim refuses (exit 1) on: weak correlation, NaN peak, under half the frames kept,
 #   or |Pi->Mac offset| > 5 s (--max-offset widens it for a deliberately drifted clock)
 ```
-Pi smoke test, probe awake, before the first real flight (see ONE_BUTTON.md):
+Capture smoke test, probe awake, Mac on the probe network (see ONE_BUTTON.md):
 ```
-ssh er@192.168.196.134 'cd ~/Documents/ultrasound-cobot && LD_LIBRARY_PATH=$PWD/sdk_lib python3.10 cast_headless.py --section 900 --ip 192.168.1.1 --port 5828 --seconds 10'
-#   pass = raw_*.bin/.json on disk under clarius_sessions/section_900 and imu_sample_count > 0
+/opt/anaconda3/envs/clarius/bin/python src/capture/cast_headless.py \
+  --section 900 --ip 192.168.1.1 --port 5828 --root data/clarius_sessions --seconds 10
+#   pass = raw_*.bin/.json under data/clarius_sessions/section_900 and imu_sample_count > 0
+#   capture runs on the Mac: the Cast SDK cannot render on the Pi (ONE_BUTTON.md)
 ```
 
 ## VESSELS
@@ -87,8 +89,8 @@ python3 touch_calib.py                    # Pi; gimbal-safe version
 |---|---|
 | `fly.py` + `Makefile` | the button: one acquisition, then the file-keyed post chain |
 | `run_sweep.py` | `preflight()` gates (imported by fly.py); its own CLI is the manual flow |
-| `src/capture/cast_capture.py` | capture core shared by the GUI and `cast_headless.py` (Pi) |
-| `ultrasound-cobot/flight.sh` | Pi: probe WiFi -> headless capture -> arm -> pair exec log |
+| `src/capture/cast_capture.py` | capture core shared by the GUI and `cast_headless.py` |
+| `ultrasound-cobot/flight.sh` | Pi: `net` brings up the probe WiFi, `fly` plays the launch file |
 | `src/calibration/guided_sweep_reader.py` | perceive: markers -> calib/vision_anchor.json |
 | `ultrasound-cobot/shift_joint_path.py` + `calib/mycobot_320_pi.urdf` | plan: taught skill + anchor -> verified joints |
 | `ultrasound-cobot/execute_sweep.py` | act: joint playback + exec log + manifest (`--no-prompt` for flight.sh) |

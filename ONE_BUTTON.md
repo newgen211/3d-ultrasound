@@ -10,23 +10,34 @@
 | `Makefile` | Mac | `sweep` and the file-keyed post chain: trim, smooth, merge, reconstruct, vessels |
 | `run_sweep.py` | Mac | `preflight(launch, anchor, solver_report)` used by fly.py; the manual CLI still works |
 | `src/capture/cast_capture.py` | both | capture core: SDK libs, callbacks, frame store, on-disk format |
-| `src/capture/cast_headless.py` | Pi | capture without a window into `clarius_sessions/section_N` |
+| `src/capture/cast_headless.py` | Mac | capture without a window, straight into `data/clarius_sessions/section_N` |
 | `src/capture/pysidecaster.py` | Mac | the GUI, now a thin layer over cast_capture |
-| `ultrasound-cobot/flight.sh` | Pi | probe WiFi on wlan0, headless capture, `execute_sweep --no-prompt`, stop, pair exec log |
+| `ultrasound-cobot/flight.sh` | Pi | `net`: probe WiFi on wlan0, prints its address. `fly`: `execute_sweep --no-prompt`, prints the exec log |
 | `ultrasound-cobot/probe.env` | Pi | `PROBE_CON`, `PROBE_IP`, `PROBE_PORT` (gitignored; the WiFi password lives only in nmcli) |
 
 Interpreters: `realsense` env for anchor, solve, tracker, trim, smooth, merge; `clarius` env for
-reconstruct and the vessel scripts. On the Pi, `python3.10` (built from source, `make altinstall`, numpy<2) runs the capture
-and system `python3` runs the arm.
+capture, reconstruct and the vessel scripts. On the Pi, system `python3` runs the arm.
 
-The Pi runs copies of `cast_capture.py` and `cast_headless.py` from the ultrasound-cobot repo
-so they deploy by git: `make pi-sync` refreshes them from `src/capture/`, commit, push, then
-`git fetch && git checkout one-button` on the Pi. The Cast binaries (`libcast.so`,
-`pyclariuscast.so`, 12.2.0 aarch64 python310) are not in git; they sit in the Pi repo dir, with a
-focal-built `libstdc++.so.6` and `libgcc_s.so.1` in `sdk_lib/` because that Cast build wants GCC 12's
-libstdc++ (GLIBCXX_3.4.30) and Ubuntu 20.04 ships GCC 9. `flight.sh` puts `sdk_lib/` on
-`LD_LIBRARY_PATH`; the system libraries are untouched. `python3.10` is a source build (`make altinstall`,
-no deadsnakes arm64 packages exist for focal).
+## Where capture runs, and why
+
+Capture runs on the **Mac**. The Cast SDK aborts with `Failed to link shader` the moment imaging
+starts on the Pi: its scan-conversion renderer needs an OpenGL context that Ubuntu 20.04 aarch64
+cannot give it. That was tested against every Qt platform (offscreen, minimal, vnc, xcb), with
+`LIBGL_ALWAYS_SOFTWARE` and `QT_OPENGL=software`, and under `xvfb-run` with a real GLX context.
+The vendor's own `pycaster.py` connects fine there, so the SDK loads and talks to the probe; only
+rendering fails.
+
+So the Mac joins the probe's network for the flight, captures locally, and reaches the Pi at its
+address on that same network (`flight.sh net` prints it). Afterwards it rejoins the lab network and
+fetches only the exec log. One button is unchanged; only where the frames land differs.
+
+`cast_capture.py` and `cast_headless.py` are still deployed to the Pi and `make pi-sync` still
+refreshes them, against the day the Pi can render: restoring Pi-side capture then means putting the
+capture block back into `flight.sh` and pointing `fly.py` at it.
+
+Everything deploys by git: commit, push, then `git fetch && git reset --hard origin/one-button` on
+the Pi. Nothing is scp'd. The Pi also carries the Cast binaries and a `sdk_lib/` with a focal-built
+`libstdc++`, both gitignored and both unused while capture lives on the Mac.
 
 ## Run folder
 
@@ -43,21 +54,22 @@ runs/<MMDD_HHMM>_sec<N>/
 
 ## Smoke steps, in order
 
-1. **Headless capture, 10 s, probe awake, no arm.** On the Pi:
-   `cd ~/Documents/ultrasound-cobot && LD_LIBRARY_PATH=$PWD/sdk_lib python3.10 cast_headless.py --section 900 --ip 192.168.1.1 --port 5828 --seconds 10`
-   Pass: `raw_*.bin` and `raw_*.json` under `clarius_sessions/section_900`, and `imu_sample_count > 0`
-   in the first json. Then `rm -r clarius_sessions/section_900`.
+1. **Headless capture, 10 s, probe awake, no arm.** Join the probe network on the Mac, then from
+   the repo root:
+   `/opt/anaconda3/envs/clarius/bin/python src/capture/cast_headless.py --section 900 --ip 192.168.1.1 --port 5828 --root data/clarius_sessions --seconds 10`
+   Pass: `raw_*.bin` and `raw_*.json` under `data/clarius_sessions/section_900`, and
+   `imu_sample_count > 0` in the first json. Then `rm -r data/clarius_sessions/section_900` and
+   rejoin the lab network.
 2. **flight.sh in the air** with a launch file that has already flown (for example
-   `pose_logs/shifted_clamp15_0813.jsonl`), nothing under the probe:
-   `./flight.sh pose_logs/shifted_clamp15_0813.jsonl 901`
-   Pass: it ends with `section_901 frames=... exec=...` and `clarius_sessions/section_901/exec.jsonl`
-   exists. Then delete section_901.
+   `pose_logs/shifted_clamp15_0813.jsonl`), nothing under the probe. On the Pi:
+   `./flight.sh net` then `./flight.sh fly pose_logs/shifted_clamp15_0813.jsonl`
+   Pass: `net` prints `WLAN0=<ip>` and `fly` ends with `EXEC=pose_logs/exec_<stamp>.jsonl`.
 3. **`make sweep` on the phantom.** Pass: `runs/<stamp>_sec<N>/manifest.json` says `done` and
    `data/clarius_sessions/section_<N>/recovered_tubes_3d.png` exists.
 
-## Fallback
+## If capture fails on the Mac
 
-If `cast_headless` cannot initialise on the Pi (SDK init or connect fails), capture stays on the
-Mac over the shared probe LAN: run `pysidecaster.py` there as before, and change only `flight.sh`,
-dropping its capture block so it does network, arm, and the exec-log pairing. `fly.py` then fetches
-nothing and the post chain reads the Mac's own section folder.
+Fall back to the GUI: join the probe network, run `src/capture/pysidecaster.py` in the `clarius`
+env, press Start Scan when the arm reaches the hover, and Stop Scan at the end. Then run the Pi
+half by hand (`flight.sh net`, `flight.sh fly <launch>`), copy the exec pair into the section dir as
+`exec.jsonl` and `exec_meta.json`, and run `make post SEC=<N>`.
