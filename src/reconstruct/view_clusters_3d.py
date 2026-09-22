@@ -22,13 +22,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa
 
-
-def find_section(arg):
-    root = Path("data/clarius_sessions")
-    for c in (Path(arg), root / arg):
-        if c.exists():
-            return c
-    sys.exit(f"section not found: {arg}")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import SESSIONS
+from us3d.sections import find_section
+from us3d.handeye import find_handeye
 
 
 def main():
@@ -45,14 +42,11 @@ def main():
     section = find_section(args.section)
     det_path = section / "sam_detections.json"
     if not det_path.exists():
-        alt = Path("data/clarius_sessions") / section.name.replace("_cam", "") / "sam_detections.json"
+        alt = SESSIONS / section.name.replace("_cam", "") / "sam_detections.json"
         det_path = alt if alt.exists() else det_path
     detections = json.loads(det_path.read_text())["detections"]
 
-    cands = [Path(args.handeye)] if args.handeye else [section / "handeye.json", Path("calib/handeye.json")]
-    he = next((json.loads(c.read_text()) for c in cands if c and c.exists()), None)
-    if he is None:
-        sys.exit("no handeye.json")
+    he = json.loads(find_handeye(section, args.handeye).read_text())
     R_X = np.array(he["R_flange_to_image"], float)
     t_X = np.array(he["t_flange_to_image_mm"], float)
     conv = he["convention"]

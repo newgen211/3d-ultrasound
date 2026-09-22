@@ -32,18 +32,15 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import SESSIONS
+from us3d.handeye import find_handeye
+from us3d.sections import find_section
+
 try:
     from sklearn.cluster import DBSCAN
 except ImportError:
     sys.exit("need scikit-learn:  pip install scikit-learn")
-
-
-def find_section(arg):
-    root = Path("data/clarius_sessions")
-    for cand in (Path(arg), root / arg):
-        if cand.exists():
-            return cand
-    sys.exit(f"section not found: {arg}")
 
 
 def main():
@@ -62,7 +59,7 @@ def main():
     det_path = Path(args.detections) if args.detections else section / "sam_detections.json"
     if not det_path.exists():
         # detections may live in the base section, poses in the _cam copy
-        alt = Path("data/clarius_sessions") / section.name.replace("_cam", "") / "sam_detections.json"
+        alt = SESSIONS / section.name.replace("_cam", "") / "sam_detections.json"
         det_path = alt if alt.exists() else det_path
     if not det_path.exists():
         sys.exit(f"no sam_detections.json (looked at {det_path})")
@@ -70,13 +67,7 @@ def main():
     print(f"📂 {len(detections)} detections from {det_path}")
 
     # hand-eye
-    cands = [Path(args.handeye)] if args.handeye else [section / "handeye.json", Path("calib/handeye.json")]
-    he = None
-    for c in cands:
-        if c and c.exists():
-            he = json.loads(c.read_text()); break
-    if he is None:
-        sys.exit("no handeye.json")
+    he = json.loads(find_handeye(section, args.handeye).read_text())
     R_X = np.array(he["R_flange_to_image"], float)
     t_X = np.array(he["t_flange_to_image_mm"], float)
     conv = he["convention"]

@@ -43,46 +43,11 @@ import nibabel as nib
 from scipy.ndimage import gaussian_filter, uniform_filter1d
 from scipy.spatial.transform import Rotation
 
-# Anchor to the repo root, regardless of where this is launched.
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA = _REPO_ROOT / "data"
-
-
-def find_section(arg):
-    root = DATA / "clarius_sessions"
-    if not root.exists():
-        sys.exit(f"❌ No clarius_sessions/ folder at {root}")
-    if arg is None:
-        sections = sorted(
-            [d for d in root.iterdir() if d.is_dir() and d.name.startswith("section_")],
-            key=lambda p: int(p.name.split("_")[1]) if p.name.split("_")[1].isdigit() else 0,
-        )
-        if not sections:
-            sys.exit(f"❌ No section_N folders in {root}")
-        return sections[-1]
-    for cand in (Path(arg), root / arg):
-        if cand.exists():
-            return cand
-    sys.exit(f"❌ Section folder not found: {arg}")
-
-
-def load_frame(bin_path, meta):
-    f = meta["frame"]
-    lines, samples, bps = f["lines"], f["samples"], f["bps"]
-    jpg = f.get("jpg_size", 0)
-    raw = bin_path.read_bytes()
-    if jpg > 0:
-        from PIL import Image
-        import io
-        return np.array(Image.open(io.BytesIO(raw)).convert("L")).astype(np.float32)
-    dtype = np.uint8 if bps == 8 else np.uint16
-    arr = np.frombuffer(raw, dtype=dtype)
-    expected = lines * samples
-    if arr.size != expected:
-        usable = (arr.size // lines) * lines
-        arr = arr[:usable]
-        samples = usable // lines
-    return arr.reshape(lines, samples).T.astype(np.float32)  # (depth rows, width cols)
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame
+from us3d.handeye import find_handeye
+from us3d.paths import REPO_ROOT as _REPO_ROOT
+from us3d.sections import find_section
 
 
 def quat_to_matrix(qw, qx, qy, qz):
@@ -166,16 +131,8 @@ def main():
     section = find_section(args.section)
 
     # ---- locate handeye.json ----
-    cands = [Path(args.handeye)] if args.handeye else [section / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]
-    he, he_path = None, None
-    for c in cands:
-        if c and c.exists():
-            he = json.loads(c.read_text())
-            he_path = c
-            break
-    if he is None:
-        sys.exit("❌ No handeye.json found. Run calibrate_handeye.py, copy it to the "
-                 "project root, or pass --handeye PATH.")
+    he_path = find_handeye(section, args.handeye)
+    he = json.loads(he_path.read_text())
     R_X = np.array(he["R_flange_to_image"], float)
     t_X = np.array(he["t_flange_to_image_mm"], float)
     conv = he["convention"]
