@@ -27,7 +27,7 @@ make clean-stamps SEC=<N>           # force trim + merge to rerun
 ```
 Pi smoke test, probe awake, before the first real flight (see ONE_BUTTON.md):
 ```
-ssh er@192.168.196.134 'cd ~/Documents/ultrasound-cobot && python3.10 cast_headless.py --section 900 --ip 192.168.1.1 --port 5828 --seconds 10'
+ssh er@192.168.196.134 'cd ~/Documents/ultrasound-cobot && LD_LIBRARY_PATH=$PWD/sdk_lib python3.10 cast_headless.py --section 900 --ip 192.168.1.1 --port 5828 --seconds 10'
 #   pass = raw_*.bin/.json on disk under clarius_sessions/section_900 and imu_sample_count > 0
 ```
 
