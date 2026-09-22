@@ -29,7 +29,8 @@ from reward_signals import RewardSignals, combine
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("section")
-    ap.add_argument("--model", default="models/best_regated.pt")
+    ap.add_argument("--model", default="best_regated.pt",
+                    help="checkpoint: a path, or a name under models/")
     ap.add_argument("--conf", type=float, default=0.25)
     ap.add_argument("--csv", action="store_true")
     args = ap.parse_args()

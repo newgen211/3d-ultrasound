@@ -7,7 +7,7 @@ sim/training loop and the live controller on the real arm, so the policy
 never sees a different signal at deployment than it trained on.
 
     from reward_signals import RewardSignals
-    rs = RewardSignals(model="models/best_regated.pt")
+    rs = RewardSignals()          # defaults to models/best_regated.pt
     out = rs.update(gray_frame, axial_mm=0.0513, lateral_mm=0.130)
     # -> dict(centered=..., visible=..., patency=..., coupling=...,
     #         n_vessels=..., tracked=bool)
@@ -36,6 +36,12 @@ cannot see the rest of the sweep.
 """
 
 from collections import deque
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import model as _model
+
 import numpy as np
 
 # gentle-contact reference: aspect p75 measured on a freehand capture
@@ -57,9 +63,10 @@ class _Track:
 
 
 class RewardSignals:
-    def __init__(self, model="models/best_regated.pt", conf=0.25,
+    def __init__(self, model=None, conf=0.25,
                  baseline_aspect=BASELINE_ASPECT, device=None):
         from ultralytics import YOLO
+        model = str(_model(model or "best_regated.pt"))
         self.model = YOLO(model)
         self.conf = conf
         self.baseline = float(baseline_aspect)
