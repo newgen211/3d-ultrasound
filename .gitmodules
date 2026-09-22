@@ -1,0 +1,6 @@
+[submodule "src/segment/sam3"]
+	path = src/segment/sam3
+	url = https://github.com/facebookresearch/sam3.git
+[submodule "ultrasound-cobot"]
+	path = ultrasound-cobot
+	url = https://github.com/newgen211/ultrasound-cobot.git
