@@ -45,7 +45,8 @@ ANCHOR     = Path("calib/vision_anchor.json")
 LOGS       = Path("data/pose_logs")
 SESS       = Path("data/clarius_sessions")
 PI_USER    = "er"
-PI_ZT      = f"{PI_USER}@192.168.196.134"      # over the lab network / ZeroTier
+PI_IP      = "192.168.196.134"                 # ZeroTier, reachable from the lab network
+PI_ZT      = f"{PI_USER}@{PI_IP}"
 PI_DIR     = "Documents/ultrasound-cobot"
 WIFI_IF    = os.environ.get("WIFI_IF", "en0")
 PROBE_SSID = "DIRECT-PALHD3012406A0356"
@@ -97,20 +98,93 @@ def current_ssid():
     return out.split(": ", 1)[1].strip() if ": " in out else None
 
 
-def join(ssid, want_gateway=None, timeout=45):
-    """Join a network and wait until it is actually usable."""
-    sh(["networksetup", "-setairportnetwork", WIFI_IF, ssid], f"wifi:{ssid}")
+def _ping(host):
+    return subprocess.run(["ping", "-c1", "-W2", host],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+
+def _wifi_password(ssid):
+    """Read the network's password out of the System keychain.
+
+    networksetup will not join a WPA network without being handed the password,
+    even one macOS already knows: it fails with error -3900.
+    """
+    p = subprocess.run(["security", "find-generic-password", "-wa", ssid,
+                        "/Library/Keychains/System.keychain"],
+                       stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    pw = p.stdout.strip()
+    if not pw:
+        raise SystemExit(
+            f"ABORT: no password for {ssid} in the System keychain, so networksetup "
+            f"would fail with -3900. Join the network once by hand to store it, or:\n"
+            f"  sudo security add-generic-password -D 'AirPort network password' "
+            f"-a {ssid} -s {ssid} -w '<password>' /Library/Keychains/System.keychain")
+    return pw
+
+
+def join_probe(timeout=45):
+    """Join the probe's network and wait until it is actually usable.
+
+    The password never reaches the log: the run folder is not the place for it.
+    """
+    pw = _wifi_password(PROBE_SSID)
+    stage = f"wifi:{PROBE_SSID}"
+    print(f"[{stage}] networksetup -setairportnetwork {WIFI_IF} {PROBE_SSID} <password>", flush=True)
+    log.write(f"\n== {stage}\n")
+    r = subprocess.run(["networksetup", "-setairportnetwork", WIFI_IF, PROBE_SSID, pw],
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    out = r.stdout.replace(pw, "<password>")
+    log.write(out)
+    log.flush()
+    print(out, end="")
+    manifest["stages"][stage] = r.returncode
+    note()
+    if r.returncode or "rror" in out or "ailed" in out:
+        raise SystemExit(f"ABORT: could not join {PROBE_SSID}: {out.strip() or r.returncode}")
+
+    # An SSID is not yet a usable network. Wait for an address, then for the probe.
+    t0 = time.time()
+    addr = ""
+    while time.time() - t0 < 20 and not addr:
+        time.sleep(1)
+        addr = subprocess.run(["ipconfig", "getifaddr", WIFI_IF],
+                              stdout=subprocess.PIPE, text=True).stdout.strip()
+    if not addr:
+        raise SystemExit(f"ABORT: joined {PROBE_SSID} but {WIFI_IF} got no address in 20 s")
+    print(f"  {WIFI_IF} has {addr}", flush=True)
+    note(mac_probe_ip=addr)
+    while time.time() - t0 < timeout:
+        if _ping(PROBE_IP):
+            return True
+        time.sleep(2)
+    raise SystemExit(f"ABORT: {WIFI_IF} is {addr} but the probe at {PROBE_IP} does not answer")
+
+
+def rejoin_lab(ssid, timeout=90):
+    """Come back to the lab network after the flight.
+
+    The lab network is enterprise auth, which setairportnetwork cannot drive:
+    the supplicant has to run the handshake from the stored profile. Cycling the
+    radio makes macOS reassociate on its own. Done when the Pi answers over
+    ZeroTier again, which is what the rest of the run needs. Never raises: the
+    capture is already on disk by this point, and fetch says so plainly if the
+    network really is gone.
+    """
+    print(f"[wifi] rejoining {ssid}: cycling the {WIFI_IF} radio", flush=True)
+    subprocess.run(["networksetup", "-setairportpower", WIFI_IF, "off"])
+    time.sleep(5)
+    subprocess.run(["networksetup", "-setairportpower", WIFI_IF, "on"])
     t0 = time.time()
     while time.time() - t0 < timeout:
-        time.sleep(2)
-        if current_ssid() != ssid:
-            continue
-        if want_gateway is None:
+        time.sleep(3)
+        if _ping(PI_IP):
+            print(f"  back on {current_ssid()}, the Pi answers", flush=True)
+            note(rejoined_ssid=current_ssid())
             return True
-        if subprocess.run(["ping", "-c1", "-W2", want_gateway],
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
-            return True
-    raise SystemExit(f"ABORT: joined {ssid} but {want_gateway or 'the network'} is unreachable")
+    print(f"  (still no route to the Pi after {timeout} s; the frames are safe in "
+          f"{SESS / ('section_%d' % sec)}, but fetch will fail until the network is back)",
+          flush=True)
+    return False
 
 
 def pi_clock_offset(host):
@@ -317,7 +391,7 @@ try:
     note(pi_lan=pi_lan)
     pi_probe = f"{PI_USER}@{pi_lan}"
 
-    join(PROBE_SSID, want_gateway=PROBE_IP)
+    join_probe()
     capture = start_capture()
     out = sh(["ssh", pi_probe, f"cd {PI_DIR} && ./flight.sh fly pose_logs/{launch.name} "
                                f"{SPEED} {RATE} {DELAY}"], "flight")
@@ -328,10 +402,7 @@ finally:
         stop_capture(capture)
     stop_tracker(tracker)
     if lab_ssid and current_ssid() != lab_ssid:
-        try:
-            join(lab_ssid)
-        except SystemExit as e:
-            print(f"  (could not rejoin {lab_ssid}: {e})", flush=True)
+        rejoin_lab(lab_ssid)
 
 fetch_exec(PI_ZT, exec_path)
 note(state="acquired")

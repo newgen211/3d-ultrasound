@@ -31,6 +31,12 @@ So the Mac joins the probe's network for the flight, captures locally, and reach
 address on that same network (`flight.sh net` prints it). Afterwards it rejoins the lab network and
 fetches only the exec log. One button is unchanged; only where the frames land differs.
 
+Joining needs the password handed to `networksetup`, even for a network macOS already knows, or it
+fails with error -3900. `fly.py` reads it from the System keychain and keeps it out of the run log.
+If it is not there, join the probe network once by hand and it will be. Coming back is the other
+way round: the lab network is enterprise auth, which `networksetup` cannot drive, so `fly.py`
+cycles the Wi-Fi radio and waits for the Pi to answer over ZeroTier again.
+
 `cast_capture.py` and `cast_headless.py` are still deployed to the Pi and `make pi-sync` still
 refreshes them, against the day the Pi can render: restoring Pi-side capture then means putting the
 capture block back into `flight.sh` and pointing `fly.py` at it.
