@@ -30,6 +30,9 @@ ap.add_argument("cam_log", help="track_probe log covering this capture")
 ap.add_argument("--margin", type=float, default=0.5,
                 help="seconds kept on each side of the playback window")
 ap.add_argument("--target-id", type=int, default=0)
+ap.add_argument("--max-offset", type=float, default=5.0,
+                help="largest Pi->Mac clock offset (s) the alignment may report; the lag "
+                     "search only considers lags inside it (default 5, NTP-synced clocks)")
 ap.add_argument("--apply", action="store_true", help="actually move files")
 args = ap.parse_args()
 
@@ -104,6 +107,10 @@ base = int(Tc[0]) - int(Te[0])
 lo = (frame_t.min() - t_end_pi - base) / 1e9      # window end   >= first frame
 hi = (frame_t.max() - t_start_pi - base) / 1e9    # window start <= last frame
 feasible = (lags >= lo) & (lags <= hi)
+# and only lags whose implied Pi->Mac clock offset is sane: the camera also sees
+# the approach before playback and the homing after it, neither of which the exec
+# log contains, and those spikes can out-correlate the sweep at a wildly wrong lag.
+feasible &= np.abs(base + lags * 1e9) <= args.max_offset * 1e9
 if not feasible.any():
     sys.exit("no feasible lag — exec meta and frames can't correspond; wrong files?")
 corr_f = np.where(feasible, corr, -np.inf)
@@ -142,9 +149,9 @@ if keep_n == 0:
 if keep_n < 0.5 * len(sidecars):
     sys.exit(f"window keeps only {keep_n} of {len(sidecars)} frames (under half): "
              f"offset or exec pair is wrong. Not moving anything.")
-if abs(offset_ns) > 5e9:
+if abs(offset_ns) > args.max_offset * 1e9:
     sys.exit(f"Pi->Mac clock offset {offset_ns/1e9:+.1f} s is outside the sane window "
-             f"(5 s): wrong exec pair or cam log. Not moving anything.")
+             f"({args.max_offset:g} s, --max-offset): wrong exec pair or cam log. Not moving anything.")
 if not args.apply:
     print("(dry run — add --apply to move excluded frames to excluded/)")
     sys.exit(0)
