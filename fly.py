@@ -191,35 +191,56 @@ def kill_stale_trackers():
     note(killed_stale_trackers=pids)
 
 
-def start_tracker(timeout=30):
+def start_tracker(timeout=30, attempts=3):
     """Start track_probe and wait until its log actually grows.
 
     Warm-up is not a fixed cost: the RealSense settles, then a marker has to come
     into view before the first pose is written. So poll for growth rather than
-    sleep a guessed interval. Anything that fails here stops the process it
-    started, so a failed gate cannot leave a root-owned tracker on the camera.
+    sleep a guessed interval.
+
+    The anchor reader has just released the camera, and opening it again too
+    soon leaves it wedged so the first frames never arrive. Hence the pause
+    before the first attempt, and a retry whenever the tracker dies during
+    warm-up. A tracker that stays alive but writes nothing is a different
+    problem (nothing in view), so that one aborts without retrying.
+
+    Every failure path stops the process it started: a failed gate must not
+    leave a root-owned tracker holding the camera.
     """
     kill_stale_trackers()
     cam = LOGS / "probe_pose_log.jsonl"
-    size0 = cam.stat().st_size if cam.exists() else 0
-    p = subprocess.Popen(["sudo", PY_RS, "src/pose/track_probe.py"],
-                         stdout=open(run / "track_probe.out", "w"), stderr=subprocess.STDOUT)
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        time.sleep(1)
-        waited = time.time() - t0
-        if p.poll() is not None:
-            raise SystemExit(f"ABORT: track_probe exited after {waited:.0f} s, "
-                             f"see {run / 'track_probe.out'}")
-        if cam.exists() and cam.stat().st_size > size0:
-            print(f"  tracker warmed up in {waited:.0f} s", flush=True)
-            note(tracker_warmup_s=round(waited, 1))
-            return p
-        if int(waited) % 10 == 0 and waited >= 10:
-            print(f"  waiting for the first pose ({waited:.0f}/{timeout} s) ...", flush=True)
-    _kill_tracker(p)
-    raise SystemExit(f"ABORT: {cam} did not grow in {timeout} s. track_probe is running "
-                     f"but writing no poses: is a marker in view? See {run / 'track_probe.out'}")
+    time.sleep(3)          # let the reader's handle on the camera actually go
+    for attempt in range(1, attempts + 1):
+        size0 = cam.stat().st_size if cam.exists() else 0
+        out_path = run / ("track_probe.out" if attempt == 1 else f"track_probe.{attempt}.out")
+        p = subprocess.Popen(["sudo", PY_RS, "src/pose/track_probe.py"],
+                             stdout=open(out_path, "w"), stderr=subprocess.STDOUT)
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            time.sleep(1)
+            waited = time.time() - t0
+            if p.poll() is not None:
+                tail = (out_path.read_text().strip().splitlines() or [""])[-1]
+                print(f"  track_probe exited after {waited:.0f} s "
+                      f"(attempt {attempt}/{attempts}): {tail[:90]}", flush=True)
+                break
+            if cam.exists() and cam.stat().st_size > size0:
+                print(f"  tracker warmed up in {waited:.0f} s", flush=True)
+                note(tracker_warmup_s=round(waited, 1), tracker_attempts=attempt)
+                return p
+            if int(waited) % 10 == 0 and waited >= 10:
+                print(f"  waiting for the first pose ({waited:.0f}/{timeout} s) ...", flush=True)
+        else:
+            _kill_tracker(p)
+            raise SystemExit(f"ABORT: {cam} did not grow in {timeout} s. track_probe is "
+                             f"running but writing no poses: is a marker in view? "
+                             f"See {out_path}")
+        _kill_tracker(p)
+        if attempt < attempts:
+            time.sleep(5)
+    note(tracker_attempts=attempts)
+    raise SystemExit(f"ABORT: track_probe died during warm-up on all {attempts} attempts. "
+                     f"The camera is not coming up: replug it. See {run}/track_probe*.out")
 
 
 def stop_tracker(p):

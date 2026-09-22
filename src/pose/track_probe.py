@@ -37,11 +37,65 @@ _h = MARKER_MM / 2.0
 OBJ = np.array([[-_h,_h,0],[_h,_h,0],[_h,-_h,0],[-_h,-_h,0]], dtype=np.float32)
 SUBPIX_CRIT = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 40, 1e-4)
 
-pipe = rs.pipeline()
-cfg = rs.config()
-cfg.enable_stream(rs.stream.depth, WIDTH, HEIGHT, rs.format.z16, FPS)
-cfg.enable_stream(rs.stream.color, WIDTH, HEIGHT, rs.format.bgr8, FPS)
-profile = pipe.start(cfg)
+def reset_device():
+    """Power-cycle the camera before opening it.
+
+    Opening the RealSense straight after another program released it can leave
+    it wedged: the pipeline starts but the first frames never arrive ("Frame
+    didn't arrive within 5000"). A hardware reset clears that. The device then
+    has to re-enumerate on the USB bus before it can be opened again.
+    """
+    devs = rs.context().query_devices()
+    if not len(devs):
+        raise SystemExit("no RealSense found: check USB / sudo, or replug.")
+    try:
+        devs[0].hardware_reset()
+    except Exception as e:
+        print(f"!! hardware_reset failed ({e}); opening without it")
+        return
+    print("camera reset, waiting for it to come back ...")
+    for _ in range(20):
+        time.sleep(1)
+        if len(rs.context().query_devices()):
+            time.sleep(1.5)          # let it settle after enumerating
+            return
+    raise SystemExit("camera did not come back after a hardware reset; replug it.")
+
+
+def open_camera(attempts=3):
+    """Start the pipeline and pull the first frames, retrying the whole open.
+
+    The first wait_for_frames is where a wedged device shows up, so the warm-up
+    belongs inside the retry rather than after it: a pipeline that started
+    cleanly can still never deliver.
+    """
+    last = None
+    for attempt in range(1, attempts + 1):
+        pipe = rs.pipeline()
+        cfg = rs.config()
+        cfg.enable_stream(rs.stream.depth, WIDTH, HEIGHT, rs.format.z16, FPS)
+        cfg.enable_stream(rs.stream.color, WIDTH, HEIGHT, rs.format.bgr8, FPS)
+        try:
+            profile = pipe.start(cfg)
+            print("Warming up...")
+            for _ in range(15):
+                pipe.wait_for_frames()
+            return pipe, profile
+        except RuntimeError as e:
+            last = e
+            print(f"!! camera open {attempt}/{attempts} failed: {e}")
+            try:
+                pipe.stop()
+            except Exception:
+                pass
+            if attempt < attempts:
+                time.sleep(3)
+                reset_device()
+    raise SystemExit(f"camera would not deliver frames after {attempts} attempts: {last}")
+
+
+reset_device()
+pipe, profile = open_camera()
 align = rs.align(rs.stream.color)
 depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
 
@@ -95,9 +149,6 @@ buf_xy, buf_az, buf_dz = [], [], []
 prev_R = {}   # id -> last accepted rotation matrix (flip suppression)
 
 try:
-    print("Warming up...")
-    for _ in range(15):
-        pipe.wait_for_frames()
     print("Live view open. Press q (or Ctrl-C) to stop.")
     while True:
         frames = align.process(pipe.wait_for_frames())
