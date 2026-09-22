@@ -10,7 +10,7 @@
 | `Makefile` | Mac | `sweep` and the file-keyed post chain: trim, smooth, merge, reconstruct, vessels |
 | `run_sweep.py` | Mac | `preflight(launch, anchor, solver_report)` used by fly.py; the manual CLI still works |
 | `src/capture/cast_capture.py` | both | capture core: SDK libs, callbacks, frame store, on-disk format |
-| `src/capture/cast_headless.py` | Mac | capture without a window, straight into `data/clarius_sessions/section_N` |
+| `src/capture/cast_headless.py` | Mac | capture without a window, straight into `data/clarius_sessions/section_N`. Runs a Qt event loop: the SDK delivers frames through it, and `--interval-ms` caps the rate (50 ms means at most 20/s) |
 | `src/capture/pysidecaster.py` | Mac | the GUI, now a thin layer over cast_capture |
 | `ultrasound-cobot/flight.sh` | Pi | `net`: probe WiFi on wlan0, prints its address. `fly`: `execute_sweep --no-prompt`, prints the exec log |
 | `ultrasound-cobot/probe.env` | Pi | `PROBE_CON`, `PROBE_IP`, `PROBE_PORT` (gitignored; the WiFi password lives only in nmcli) |
