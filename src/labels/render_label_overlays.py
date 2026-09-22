@@ -1,19 +1,37 @@
 #!/usr/bin/env python3
-"""Draw v2/v3 labels on sample frames -> overlay jpgs for eyeballing."""
+"""Draw filtered labels on sample frames -> overlay jpgs for eyeballing.
+
+    python3 src/labels/render_label_overlays.py section_90
+    python3 src/labels/render_label_overlays.py section_90 --version v4
+
+--version absorbs the former render_v4.py / render_v5.py, which were this same
+script pointed at a different detections file."""
+import argparse
 import json, sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import REPO_ROOT
+from us3d.sections import find_section
 import cv2
 import numpy as np
 
-for sec_name in sys.argv[1:]:
-    sec = Path("data/clarius_sessions") / sec_name
-    dets = json.loads((sec / "sam_detections_v5f.json").read_text())["detections"]
+ap = argparse.ArgumentParser(description=__doc__,
+                             formatter_class=argparse.RawDescriptionHelpFormatter)
+ap.add_argument("sections", nargs="+")
+ap.add_argument("--version", default="v5f", help="detections version to draw (default v5f)")
+args = ap.parse_args()
+VERSION = args.version
+
+for sec_name in args.sections:
+    sec = find_section(sec_name)
+    dets = json.loads((sec / ("sam_detections_%s.json" % VERSION)).read_text())["detections"]
     by_frame = {}
     for d in dets:
         by_frame.setdefault(d["frame_index"], []).append(d)
     rep_p = sec / "compression_report.json"
     rep = json.loads(rep_p.read_text())["frames"] if rep_p.exists() else None
-    out = Path("overlays") / sec_name
+    out = REPO_ROOT / "overlays" / sec_name
     out.mkdir(parents=True, exist_ok=True)
     # sample: every Nth labeled frame, max 25
     frames = sorted(by_frame.keys())

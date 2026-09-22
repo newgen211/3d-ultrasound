@@ -5,13 +5,16 @@ Keys: d=next(saves) | a=prev(saves) | g=next frame with all-open boxes | q=quit(
 """
 import glob, sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import YOLO_HUMAN
 import matplotlib
 matplotlib.use("MacOSX")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import cv2
 
-OUT = Path("yolo_ds_human")
+OUT = YOLO_HUMAN
 stems = []
 for lp in sorted(glob.glob(str(OUT/"labels/train/*.txt"))):
     if open(lp).read().strip():

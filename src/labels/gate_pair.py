@@ -4,13 +4,16 @@ pair (depth agreement, similar radii, sane lateral separation). Kept frames keep
 ALL their dets. --census prints survival only; without it writes v5fp files."""
 import json, sys, itertools
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.sections import find_section
 DEPTH_TOL = 4.0     # mm, |depth difference| for the pair
 R_RATIO   = 1.8     # max/min radius
 SEP_MIN, SEP_MAX = 2.0, 30.0   # mm lateral separation
 census = "--census" in sys.argv
 secs = [a for a in sys.argv[1:] if not a.startswith("--")]
 for sec in secs:
-    p = Path(f"data/clarius_sessions/{sec}/sam_detections_v5f.json")
+    p = find_section(sec) / "sam_detections_v5f.json"
     j = json.loads(p.read_text())
     byf = {}
     for d in j["detections"]:
@@ -31,4 +34,4 @@ for sec in secs:
         out = dict(j); out["detections"] = kept
         out["gate"] = dict(rule="pair-consistency", depth_tol_mm=DEPTH_TOL,
                            r_ratio=R_RATIO, sep_mm=[SEP_MIN, SEP_MAX])
-        Path(f"data/clarius_sessions/{sec}/sam_detections_v5fp.json").write_text(json.dumps(out))
+        (find_section(sec) / "sam_detections_v5fp.json").write_text(json.dumps(out))

@@ -13,18 +13,19 @@ matplotlib.use("MacOSX")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib.widgets import RectangleSelector
-sys.path.insert(0, "src/segment")
-from segment_tube import load_frame, to_u8
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.paths import SESSIONS, YOLO_HUMAN
 
 PLAN = [("section_106", 12), ("section_109", 14), ("section_123", 12),
         ("section_123", 5)]   # extra 123 pass: squish-heavy = crushed supply
-OUT = Path("yolo_ds_human")
+OUT = YOLO_HUMAN
 (OUT/"images/train").mkdir(parents=True, exist_ok=True)
 (OUT/"labels/train").mkdir(parents=True, exist_ok=True)
 
 tasks, seen = [], set()
 for sec, stride in PLAN:
-    raws = sorted(glob.glob(f"data/clarius_sessions/{sec}/raw_*.json"))
+    raws = sorted(glob.glob(str(SESSIONS / sec / "raw_*.json")))
     for i in range(0, len(raws), stride):
         if (sec, i) not in seen:
             seen.add((sec, i)); tasks.append((sec, i, raws[i]))
