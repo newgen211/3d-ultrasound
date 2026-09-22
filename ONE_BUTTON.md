@@ -6,7 +6,7 @@
 
 | File | Runs on | Does |
 |---|---|---|
-| `fly.py` | Mac | gates, anchor read, solve, deploy launch file, start tracker, one ssh to the Pi, fetch, verify, then `make post` |
+| `fly.py` | Mac | anchor read, solve, start tracker, gates, deploy, join the probe network, capture, one ssh to the Pi for the flight, rejoin the lab, fetch the exec log, then `make post` |
 | `Makefile` | Mac | `sweep` and the file-keyed post chain: trim, smooth, merge, reconstruct, vessels |
 | `run_sweep.py` | Mac | `preflight(launch, anchor, solver_report)` used by fly.py; the manual CLI still works |
 | `src/capture/cast_capture.py` | both | capture core: SDK libs, callbacks, frame store, on-disk format |

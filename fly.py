@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 """fly.py: one autonomous acquisition.
 
-gates -> anchor -> solve -> deploy -> tracker -> probe WiFi -> capture (Mac)
+anchor -> solve -> tracker -> gates -> deploy -> probe WiFi -> capture (Mac)
 -> Pi flight -> stop capture -> lab WiFi -> fetch exec log -> verify -> make post
+
+The tracker starts before the gates because one of them is that its log is
+growing, which is only true once it is running. The gates are then the last
+thing between here and the arm moving.
 
 Capture runs here, not on the Pi: the Cast SDK needs a GL context the Pi cannot
 provide (ONE_BUTTON.md). So the Mac joins the probe's network for the flight and
@@ -130,6 +134,7 @@ def anchor():
 
 
 def solve():
+    """Solve the launch file and return the solver's report, which preflight audits."""
     gate(TEACH.exists(), f"teach file not found: {TEACH}")
     with open(launch, "w") as f:
         p = subprocess.run([PY_RS, "shift_joint_path.py", str(TEACH.resolve()),
@@ -145,7 +150,7 @@ def solve():
         raise SystemExit("ABORT: solver gate refused")
     shutil.copy(launch, run / launch.name)
     note()
-    preflight(launch, ANCHOR, p.stderr)
+    return p.stderr
 
 
 def start_tracker():
@@ -216,21 +221,25 @@ lab_ssid = current_ssid()
 note(state="started", lab_ssid=lab_ssid, pi_clock_offset_s=pi_clock_offset(PI_ZT))
 sh(["-v"], "sudo", sudo=True)                # one password prompt up front
 anchor()
-solve()
-sh(["scp", launch, f"{PI_ZT}:{PI_DIR}/pose_logs/"], "deploy")
-sh(["ssh", PI_ZT, f"test -s {PI_DIR}/pose_logs/{launch.name}"], "deploy-verify")
+solver_report = solve()
 
-# Bring the Pi onto the probe network first, so we know where to reach it once we
-# are on it too and off the lab network.
-net = sh(["ssh", PI_ZT, f"cd {PI_DIR} && ./flight.sh net"], "pi-net")
-pi_lan = next((l.split("=", 1)[1].strip() for l in net.splitlines() if l.startswith("WLAN0=")), None)
-gate(pi_lan, "the Pi did not report its address on the probe network")
-note(pi_lan=pi_lan)
-pi_probe = f"{PI_USER}@{pi_lan}"
-
+# From here the tracker is running, so everything else sits in the try that
+# stops it again.
 tracker = start_tracker()
 capture = None
 try:
+    preflight(launch, ANCHOR, solver_report)
+    sh(["scp", launch, f"{PI_ZT}:{PI_DIR}/pose_logs/"], "deploy")
+    sh(["ssh", PI_ZT, f"test -s {PI_DIR}/pose_logs/{launch.name}"], "deploy-verify")
+
+    # Bring the Pi onto the probe network first, so we know where to reach it
+    # once we are on it too and off the lab network.
+    net = sh(["ssh", PI_ZT, f"cd {PI_DIR} && ./flight.sh net"], "pi-net")
+    pi_lan = next((l.split("=", 1)[1].strip() for l in net.splitlines() if l.startswith("WLAN0=")), None)
+    gate(pi_lan, "the Pi did not report its address on the probe network")
+    note(pi_lan=pi_lan)
+    pi_probe = f"{PI_USER}@{pi_lan}"
+
     join(PROBE_SSID, want_gateway=PROBE_IP)
     capture = start_capture()
     out = sh(["ssh", pi_probe, f"cd {PI_DIR} && ./flight.sh fly pose_logs/{launch.name} "
