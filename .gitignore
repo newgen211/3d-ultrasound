@@ -77,7 +77,10 @@ pose_logs/exec_*
 # the rest of data/ stays ignored.
 # --- additions Aug 31: gold-label sprint + gauge/E5 era ---
 overlays/
-attic/
+# attic/ holds superseded scripts (tracked, with a one-line note each) and old bundles
+attic/*
+!attic/*.py
+!attic/README.md
 models/*
 !models/README.md
 *.pt

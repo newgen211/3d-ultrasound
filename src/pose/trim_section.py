@@ -131,11 +131,20 @@ for sc, h in zip(sidecars, [json.load(open(s)).get("host_timestamp_ns") for s in
         drop.append(sc)
 print(f"frames: keep {keep_n}, exclude {len(drop)} of {len(sidecars)}")
 
+if not np.isfinite(peak):
+    sys.exit("correlation peak is NaN: a null coordinate in the exec or cam log. "
+             "Not moving anything.")
 if peak <= 0.3:
     sys.exit("correlation too weak to trust the window — not moving anything. "
              "Check that the cam log covers this capture.")
 if keep_n == 0:
     sys.exit("window keeps ZERO frames — offset must be wrong; not moving anything.")
+if keep_n < 0.5 * len(sidecars):
+    sys.exit(f"window keeps only {keep_n} of {len(sidecars)} frames (under half): "
+             f"offset or exec pair is wrong. Not moving anything.")
+if abs(offset_ns) > 5e9:
+    sys.exit(f"Pi->Mac clock offset {offset_ns/1e9:+.1f} s is outside the sane window "
+             f"(5 s): wrong exec pair or cam log. Not moving anything.")
 if not args.apply:
     print("(dry run — add --apply to move excluded frames to excluded/)")
     sys.exit(0)

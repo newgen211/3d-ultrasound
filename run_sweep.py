@@ -56,24 +56,20 @@ def file_growing(p, wait=2.0):
     time.sleep(wait)
     return p.stat().st_size > a
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("launch", help="shifted_*.jsonl from shift_joint_path")
-    ap.add_argument("--delay", type=int, default=45)
-    ap.add_argument("--rate", type=int, default=2)
-    ap.add_argument("--speed", type=int, default=25)
-    ap.add_argument("--no-scp", action="store_true", help="skip pushing the launch file")
-    ap.add_argument("--grace", type=int, default=20,
-                    help="extra s after delay before declaring the capture dead")
-    args = ap.parse_args()
-
+def preflight(launch, anchor, solver_report_text=""):
+    """The pre-flight gates. Raises SystemExit (via fail) on any failed gate.
+    Returns (launch Path, set of section names present before the flight).
+    Pure file checks plus the live camera-log check; no prompts, no Pi."""
     print("\n=== PRE-FLIGHT ===")
-    lp = Path(args.launch)
+    lp = Path(launch)
     if not lp.exists():
         fail(f"launch file not found: {lp}")
 
-    # 1. launch-file header audit (shift_joint_path writes '#' header lines)
-    header = [l for l in lp.read_text().splitlines() if l.startswith("#")]
+    # 1. solver report audit. shift_joint_path prints its '#' report on stderr
+    #    and only the jsonl on stdout, so the launch file itself carries no
+    #    header: the caller passes the captured report text (fly.py keeps it in
+    #    runs/<stamp>/solve.log). The CLI below passes the file's own '#' lines.
+    header = [l for l in solver_report_text.splitlines() if l.startswith("#")]
     hdr = " ".join(header)
     m = re.search(r"shift dx=([+-][\d.]+) dy=([+-][\d.]+)", hdr)
     if m:
@@ -96,8 +92,9 @@ def main():
              "reader and re-solve before flying.")
 
     # 2. anchor freshness (independent of the launch file)
-    if ANCHOR.exists():
-        a = json.loads(ANCHOR.read_text())
+    anchor = Path(anchor)
+    if anchor.exists():
+        a = json.loads(anchor.read_text())
         try:
             age_min = (time.time() - time.mktime(
                 time.strptime(a["written"], "%Y-%m-%d %H:%M:%S"))) / 60
@@ -126,6 +123,23 @@ def main():
     ok(f"disk: {free_gb:.0f} GB free")
     before = {p.name for p in SESSIONS.iterdir() if p.is_dir()}
     ok(f"{len(before)} existing sections snapshotted")
+
+    return lp, before
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("launch", help="shifted_*.jsonl from shift_joint_path")
+    ap.add_argument("--delay", type=int, default=45)
+    ap.add_argument("--rate", type=int, default=2)
+    ap.add_argument("--speed", type=int, default=25)
+    ap.add_argument("--no-scp", action="store_true", help="skip pushing the launch file")
+    ap.add_argument("--grace", type=int, default=20,
+                    help="extra s after delay before declaring the capture dead")
+    args = ap.parse_args()
+
+    lp, before = preflight(args.launch, ANCHOR,
+                           "\n".join(l for l in Path(args.launch).read_text().splitlines()
+                                     if l.startswith("#")))
 
     # 5. physical checklist
     print("\n=== PHYSICAL CHECKLIST ===")
