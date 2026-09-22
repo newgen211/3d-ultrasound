@@ -33,5 +33,5 @@ for sec in out:
         out[sec][cls] = sorted(out[sec][cls], key=lambda d: -d["quality"])[:3]
     counts = {c: len(v) for c, v in out[sec].items()}
     print(f"{sec}: {counts}")
-Path("exemplars.json").write_text(json.dumps(out, indent=1))
-print("wrote exemplars.json")
+Path("audit/exemplars.json").write_text(json.dumps(out, indent=1))
+print("wrote audit/exemplars.json")

@@ -5,7 +5,7 @@ sam3_track_v2.py — per-frame SAM 3 exemplar segmentation, v2.
 Changes vs v1 (the audit's marching orders):
   A. DUAL EXEMPLARS: every prompt includes the classical detector's best
      open-vessel box (when present) PLUS audited exemplar boxes for this
-     section from exemplars.json (open + crescent, harvested from human
+     section from audit/exemplars.json (open + crescent, harvested from human
      audit truth). SAM matches BOTH appearance classes.
      Exemplar prompts are placed on their own audited frame index — SAM 3
      PCS matches instances across the prompted frame; we prompt per frame,
@@ -16,7 +16,7 @@ Changes vs v1 (the audit's marching orders):
   C. Every detection carries "morph": "open"|"crescent" (which gate passed).
 
     python3 sam3_track_v2.py section_85 --checkpoint ~/ckpt_sam3/sam3.pt \
-        --exemplars exemplars.json --keep-jpg
+        --exemplars audit/exemplars.json --keep-jpg
 """
 import argparse
 import json
@@ -115,7 +115,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("section", nargs="?", default=None)
     ap.add_argument("--checkpoint", default=None)
-    ap.add_argument("--exemplars", default="exemplars.json")
+    ap.add_argument("--exemplars", default="audit/exemplars.json")
     ap.add_argument("--out", default=None)
     ap.add_argument("--keep-jpg", action="store_true")
     args = ap.parse_args()
