@@ -41,7 +41,8 @@ htmlcov/
 Thumbs.db
 
 # Project-specific
-# Clarius SDK binaries + TLS material (must stay at repo root; not committed)
+# Clarius SDK binaries + TLS material (live copies in src/capture/; not committed).
+# pysidecaster.py and pyimu.py load them from src/capture/ via _LIB_DIR, not from the root.
 libcast.dylib
 pyclariuscast.so
 pri.pem
@@ -64,11 +65,12 @@ sim_handoff.zip
 audit/*
 !audit/audit_truth.json
 !audit/audit_manifest.json
+!audit/exemplars.json
 
-# Pose/exec logs are data, but launch + teach files are work products — keep them
+# Pose/exec logs are data, but teach files are work products — keep them.
+# (Launch files shifted_*.jsonl live in the ultrasound-cobot repo, not here.)
 pose_logs/exec_*
 !pose_logs/sweep_teach_*.jsonl
-!pose_logs/shifted_*.jsonl
 
 # Note: calib/ (hand-eye, bridge, intrinsics, urdf), exemplars.json, handoff/, outputs/
 # are intentionally tracked. data/pose_logs/README.md is force-tracked (git add -f);
@@ -80,6 +82,7 @@ models/
 *.pt
 *.mp4
 *.avi
+outputs/videos/
 
 # gold datasets: images regenerate from sections; HUMAN LABELS DO NOT — carve them out
 yolo_ds_gold/
