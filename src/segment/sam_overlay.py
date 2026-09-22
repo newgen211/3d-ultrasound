@@ -16,7 +16,9 @@ from pathlib import Path
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
-from segment_tube import find_section
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.sections import find_section
 
 section = find_section(sys.argv[1] if len(sys.argv) > 1 else None)
 det = json.loads((section / "sam_detections.json").read_text())["detections"]

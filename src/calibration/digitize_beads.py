@@ -30,45 +30,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backend_bases import MouseButton
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame
+from us3d.sections import find_section
+
 # Anchor to the repo's data/ folder, regardless of where this is launched.
 DATA = Path(__file__).resolve().parents[2] / "data"
-
-
-def find_section(arg):
-    root = DATA / "clarius_sessions"
-    if not root.exists():
-        sys.exit(f"❌ No clarius_sessions/ folder at {root}")
-    if arg is None:
-        sections = sorted(
-            [d for d in root.iterdir() if d.is_dir() and d.name.startswith("section_")],
-            key=lambda p: int(p.name.split("_")[1]) if p.name.split("_")[1].isdigit() else 0,
-        )
-        if not sections:
-            sys.exit(f"❌ No section_N folders in {root}")
-        return sections[-1]
-    for cand in (Path(arg), root / arg):
-        if cand.exists():
-            return cand
-    sys.exit(f"❌ Section folder not found: {arg}")
-
-
-def load_frame(bin_path, meta):
-    f = meta["frame"]
-    lines, samples, bps = f["lines"], f["samples"], f["bps"]
-    jpg = f.get("jpg_size", 0)
-    raw = bin_path.read_bytes()
-    if jpg > 0:
-        from PIL import Image
-        import io
-        return np.array(Image.open(io.BytesIO(raw)).convert("L")).astype(np.float32)
-    dtype = np.uint8 if bps == 8 else np.uint16
-    arr = np.frombuffer(raw, dtype=dtype)
-    expected = lines * samples
-    if arr.size != expected:
-        usable = (arr.size // lines) * lines
-        arr = arr[:usable]
-        samples = usable // lines
-    return arr.reshape(lines, samples).T.astype(np.float32)  # (depth rows, width cols)
 
 
 def snap_to_blob(img, u, v, win=20):

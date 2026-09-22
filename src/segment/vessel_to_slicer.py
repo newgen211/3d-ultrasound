@@ -19,7 +19,7 @@ In Slicer:
   4. If it appears mirrored vs the volume, change "RAS" to "LPS" in the .mrk.json
      and re-load (NIfTI/Slicer coordinate-system mismatch escape hatch).
 
-Keep segment_tube.py, vessel_centerline.py, vessel_tube.py in the same folder.
+Detector comes from us3d.tube; keep vessel_centerline.py and vessel_tube.py here.
 """
 
 import json
@@ -29,7 +29,11 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from segment_tube import candidates, load_frame, find_section
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.handeye import find_handeye
+from us3d.frames import load_frame
+from us3d.sections import find_section
+from us3d.tube import candidates
 from vessel_centerline import track
 from vessel_tube import smooth_seq, tube_mesh, SEQ_W, OUTLIER_MM
 
@@ -74,12 +78,7 @@ def write_mrk_curve(path, C, radius):
 
 def main():
     section = find_section(sys.argv[1] if len(sys.argv) > 1 else None)
-    he = None
-    for c in [section / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]:
-        if c.exists():
-            he = json.loads(c.read_text()); break
-    if he is None:
-        sys.exit("no handeye.json")
+    he = json.loads(find_handeye(section).read_text())
     R_X = np.array(he["R_flange_to_image"], float)
     t_X = np.array(he["t_flange_to_image_mm"], float)
     conv = he["convention"]

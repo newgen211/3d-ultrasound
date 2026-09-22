@@ -26,8 +26,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, str(Path(__file__).parent))
-from segment_tube import find_section
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.sections import find_section
 
 VIS_LOW, VIS_OK = 0.15, 0.35     # hysteresis on visibility
 COUP_LOW = 0.85                  # below this = washed -> PRESS

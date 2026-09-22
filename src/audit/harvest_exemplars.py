@@ -5,7 +5,11 @@ from pathlib import Path
 import numpy as np
 import cv2
 
-AUD = Path("audit")
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import AUDIT, EXEMPLARS
+
+AUD = AUDIT
 truth = json.loads((AUD / "audit_truth.json").read_text())
 out = {}
 for k, ent in truth.items():
@@ -33,5 +37,5 @@ for sec in out:
         out[sec][cls] = sorted(out[sec][cls], key=lambda d: -d["quality"])[:3]
     counts = {c: len(v) for c, v in out[sec].items()}
     print(f"{sec}: {counts}")
-Path("audit/exemplars.json").write_text(json.dumps(out, indent=1))
-print("wrote audit/exemplars.json")
+EXEMPLARS.write_text(json.dumps(out, indent=1))
+print("wrote %s" % EXEMPLARS)

@@ -17,7 +17,11 @@ matplotlib.use("MacOSX")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
-AUD = Path("audit")
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import AUDIT
+
+AUD = AUDIT
 man = json.loads((AUD / "audit_manifest.json").read_text())
 keys = sorted(man.keys())
 outp = AUD / "audit_truth.json"

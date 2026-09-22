@@ -3,13 +3,16 @@
 import json, random, shutil, sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import AUDIT, SESSIONS
+
 SECTIONS = ["section_62", "section_81", "section_85", "section_90",
             "section_92", "section_94", "section_103", "section_104"]
 N_PER = 20
 random.seed(7)
 
-root = Path("data/clarius_sessions")
-out = Path("audit"); (out / "frames").mkdir(parents=True, exist_ok=True)
+root = SESSIONS
+out = AUDIT; (out / "frames").mkdir(parents=True, exist_ok=True)
 manifest = {}
 for s in SECTIONS:
     jpgs = sorted((root / s / "frames_jpg").glob("*.jpg"))

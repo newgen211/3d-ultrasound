@@ -15,8 +15,9 @@ from pathlib import Path
 import numpy as np
 import cv2
 
-sys.path.insert(0, str(Path(__file__).parent))
-from segment_tube import find_section
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.sections import find_section
 
 def main():
     ap = argparse.ArgumentParser()

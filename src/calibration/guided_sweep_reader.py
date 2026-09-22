@@ -29,6 +29,10 @@ import numpy as np
 import cv2
 import pyrealsense2 as rs
 
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import CALIB
+
 # ---------------------------------------------------------------- aruco compat
 def make_detector(dict_name):
     d = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, dict_name))
@@ -156,7 +160,7 @@ def camera_to_base(p1c, p2c, n_c, p1b, p2b):
 # ---------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--calib", default="guided_sweep_calib.json")
+    ap.add_argument("--calib", default=str(CALIB / "guided_sweep_calib.json"))
     args = ap.parse_args()
 
     cfg = json.load(open(args.calib))

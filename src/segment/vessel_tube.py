@@ -17,7 +17,7 @@ baseline to compare cobot-pose vs camera-pose reconstructions.
     horizontal instead of running diagonally across the camera frame. COSMETIC
     ONLY — the spread is measured before the rotation, so the number is identical.
 
-Keep segment_tube.py and vessel_centerline.py in the same folder.
+Detector comes from us3d.tube; keep vessel_centerline.py in this folder.
 """
 
 import json
@@ -28,7 +28,11 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 import matplotlib.pyplot as plt
 
-from segment_tube import candidates, load_frame, find_section
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.handeye import find_handeye
+from us3d.frames import load_frame
+from us3d.sections import find_section
+from us3d.tube import candidates
 from vessel_centerline import track
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -133,12 +137,7 @@ def main():
     lps = "--lps" in sys.argv
     section = find_section(pos_args[0] if pos_args else None)
 
-    he = None
-    for c in [section / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]:
-        if c.exists():
-            he = json.loads(c.read_text()); break
-    if he is None:
-        sys.exit("no handeye.json")
+    he = json.loads(find_handeye(section).read_text())
     R_X = np.array(he["R_flange_to_image"], float)
     t_X = np.array(he["t_flange_to_image_mm"], float)
     conv = he["convention"]

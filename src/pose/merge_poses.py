@@ -31,26 +31,11 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.sections import find_section
+
 # Anchor to the repo's data/ folder, regardless of where this is launched.
 DATA = Path(__file__).resolve().parents[2] / "data"
-
-
-def find_section(arg):
-    root = DATA / "clarius_sessions"
-    if not root.exists():
-        sys.exit(f"❌ No clarius_sessions/ folder at {root}")
-    if arg is None:
-        sections = sorted(
-            [d for d in root.iterdir() if d.is_dir() and d.name.startswith("section_")],
-            key=lambda p: int(p.name.split("_")[1]) if p.name.split("_")[1].isdigit() else 0,
-        )
-        if not sections:
-            sys.exit("❌ No section_N folders")
-        return sections[-1]
-    for cand in (Path(arg), root / arg):
-        if cand.exists():
-            return cand
-    sys.exit(f"❌ Section not found: {arg}")
 
 
 def main():

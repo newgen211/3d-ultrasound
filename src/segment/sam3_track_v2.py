@@ -27,7 +27,10 @@ from pathlib import Path
 import numpy as np
 import cv2
 
-from segment_tube import find_section, load_frame, to_u8, candidates
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.sections import find_section
+from us3d.tube import candidates
 
 MAX_EXEMPLAR_R_MM = 2.5
 MAX_VESSEL_R_MM   = 3.5

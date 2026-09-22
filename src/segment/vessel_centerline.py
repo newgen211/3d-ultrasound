@@ -22,7 +22,7 @@ Also the definitive geometry check:
 Interaction: scroll wheel zooms whichever panel the cursor is over; drag rotates
 the 3D panel.
 
-Reuses the detector/tracker from segment_tube.py (keep both in the same folder).
+Reuses the detector/tracker from us3d.tube.
 """
 
 import json
@@ -33,7 +33,11 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 import matplotlib.pyplot as plt
 
-from segment_tube import candidates, load_frame, find_section, track
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.handeye import find_handeye
+from us3d.frames import load_frame
+from us3d.sections import find_section
+from us3d.tube import candidates, track
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -44,12 +48,7 @@ def main():
     section = find_section(pos_args[0] if pos_args else None)
 
     # hand-eye
-    he = None
-    for c in [section / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]:
-        if c.exists():
-            he = json.loads(c.read_text()); break
-    if he is None:
-        sys.exit("no handeye.json (run calibrate_handeye.py / copy to project root)")
+    he = json.loads(find_handeye(section).read_text())
     R_X = np.array(he["R_flange_to_image"], float)
     t_X = np.array(he["t_flange_to_image_mm"], float)
     conv = he["convention"]

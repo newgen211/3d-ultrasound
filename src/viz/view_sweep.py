@@ -22,72 +22,9 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-def find_section(arg: str | None) -> Path:
-    """Pick the section folder to visualize."""
-    root = Path(__file__).resolve().parents[2] / "data" / "clarius_sessions"
-    if not root.exists():
-        print(f"❌ No clarius_sessions/ folder at {root}")
-        sys.exit(1)
-
-    if arg is None:
-        # auto: pick the latest section by number
-        sections = sorted(
-            [d for d in root.iterdir() if d.is_dir() and d.name.startswith("section_")],
-            key=lambda p: int(p.name.split("_")[1]) if p.name.split("_")[1].isdigit() else 0,
-        )
-        if not sections:
-            print(f"❌ No section_N folders in {root}")
-            sys.exit(1)
-        return sections[-1]
-
-    p = Path(arg)
-    if p.is_absolute() and p.exists():
-        return p
-    if p.exists():
-        return p
-    if (root / arg).exists():
-        return root / arg
-    print(f"❌ Section folder not found: {arg}")
-    sys.exit(1)
-
-
-def load_frame(bin_path: Path, meta: dict) -> np.ndarray:
-    """Decode a raw .bin frame into a 2D numpy array."""
-    frame = meta["frame"]
-    lines = frame["lines"]
-    samples = frame["samples"]
-    bps = frame["bps"]
-    jpg_size = frame.get("jpg_size", 0)
-
-    raw_bytes = bin_path.read_bytes()
-
-    if jpg_size > 0:
-        # JPEG-compressed frame
-        from PIL import Image
-        import io
-        img = Image.open(io.BytesIO(raw_bytes))
-        return np.array(img)
-
-    if bps == 8:
-        arr = np.frombuffer(raw_bytes, dtype=np.uint8)
-    elif bps == 16:
-        arr = np.frombuffer(raw_bytes, dtype=np.uint16)
-    else:
-        raise ValueError(f"Unsupported bps: {bps}")
-
-    expected = lines * samples
-    if arr.size != expected:
-        print(f"  ⚠️  {bin_path.name}: expected {expected} samples, got {arr.size}")
-        # try best-effort reshape using what we got
-        usable = (arr.size // lines) * lines
-        arr = arr[:usable]
-        samples = usable // lines
-
-    # raw layout: lines × samples, lines = scan lines (probe element direction),
-    # samples = depth direction. Display with depth as Y-axis = transpose.
-    img2d = arr.reshape(lines, samples).T  # now (samples × lines) = depth × width
-    return img2d
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame
+from us3d.sections import find_section
 
 
 def main():

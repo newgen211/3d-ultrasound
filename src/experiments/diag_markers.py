@@ -3,6 +3,7 @@ import json, glob, itertools
 import numpy as np
 from pathlib import Path
 
+import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from us3d.paths import POSE_LOGS, SESSIONS
 ROOT = SESSIONS; CAM = POSE_LOGS / "probe_pose_log_smooth.jsonl"

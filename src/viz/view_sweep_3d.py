@@ -28,52 +28,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # noqa: F401
 
-
-def find_section(arg: str | None) -> Path:
-    root = Path(__file__).resolve().parents[2] / "data" / "clarius_sessions"
-    if not root.exists():
-        print(f"❌ No clarius_sessions/ folder at {root}")
-        sys.exit(1)
-    if arg is None:
-        sections = sorted(
-            [d for d in root.iterdir() if d.is_dir() and d.name.startswith("section_")],
-            key=lambda p: int(p.name.split("_")[1]) if p.name.split("_")[1].isdigit() else 0,
-        )
-        if not sections:
-            print(f"❌ No section_N folders in {root}")
-            sys.exit(1)
-        return sections[-1]
-    p = Path(arg)
-    if p.exists():
-        return p
-    if (root / arg).exists():
-        return root / arg
-    print(f"❌ Section folder not found: {arg}")
-    sys.exit(1)
-
-
-def load_frame(bin_path: Path, meta: dict) -> np.ndarray:
-    """Decode a raw .bin frame into a 2D numpy array (samples × lines)."""
-    frame = meta["frame"]
-    lines = frame["lines"]
-    samples = frame["samples"]
-    bps = frame["bps"]
-    jpg_size = frame.get("jpg_size", 0)
-
-    raw_bytes = bin_path.read_bytes()
-    if jpg_size > 0:
-        from PIL import Image
-        import io
-        return np.array(Image.open(io.BytesIO(raw_bytes)))
-
-    dtype = np.uint8 if bps == 8 else np.uint16
-    arr = np.frombuffer(raw_bytes, dtype=dtype)
-    expected = lines * samples
-    if arr.size != expected:
-        usable = (arr.size // lines) * lines
-        arr = arr[:usable]
-        samples = usable // lines
-    return arr.reshape(lines, samples).T  # depth × width
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame
+from us3d.sections import find_section
 
 
 def quat_to_matrix(qw, qx, qy, qz):

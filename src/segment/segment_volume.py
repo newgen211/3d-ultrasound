@@ -28,7 +28,11 @@ import nibabel as nib
 from scipy.spatial.transform import Rotation
 from scipy.ndimage import map_coordinates
 
-from segment_tube import candidates, load_frame, find_section, track
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.handeye import find_handeye
+from us3d.frames import load_frame
+from us3d.sections import find_section
+from us3d.tube import candidates, track
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -55,12 +59,7 @@ def main():
     section = find_section(sys.argv[1] if len(sys.argv) > 1 else None)
 
     # ---- hand-eye ----
-    he = None
-    for c in [section / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]:
-        if c.exists():
-            he = json.loads(c.read_text()); break
-    if he is None:
-        sys.exit("no handeye.json")
+    he = json.loads(find_handeye(section).read_text())
     R_X = np.array(he["R_flange_to_image"], float)
     t_X = np.array(he["t_flange_to_image_mm"], float)
     conv = he["convention"]

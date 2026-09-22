@@ -27,10 +27,15 @@ before anyone trusts them on hardware.
 import argparse, json, time
 import numpy as np
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import CALIB
+
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--transform", default="src/calibration/cam_to_base.json")
+    ap.add_argument("--transform", default=str(CALIB / "cam_to_base.json"))
     ap.add_argument("--out", default="workspace_cloud")
     ap.add_argument("--frames", type=int, default=30, help="depth frames to median")
     ap.add_argument("--voxel", type=float, default=2.0, help="downsample (mm)")

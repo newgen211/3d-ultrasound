@@ -11,7 +11,11 @@ from pathlib import Path
 import numpy as np
 import cv2
 
-AUD = Path("audit")
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import AUDIT
+
+AUD = AUDIT
 man = json.loads((AUD / "audit_manifest.json").read_text())
 truth = json.loads((AUD / "audit_truth.json").read_text())
 

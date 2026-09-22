@@ -21,12 +21,9 @@ Outputs yolo_ds/{images,labels}/{train,val}/ + dataset.yaml, ready for:
 import argparse, json, shutil, sys
 from pathlib import Path
 
-def find_section(name):
-    for base in (Path("data/clarius_sessions"), Path(".")):
-        p = base / name
-        if p.exists():
-            return p
-    sys.exit(f"section not found: {name}")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.sections import find_section
+from us3d.paths import SESSIONS
 
 def load_report(sec):
     p = sec / "compression_report.json"

@@ -34,8 +34,10 @@ from scipy.ndimage import gaussian_filter, shift as nd_shift
 from scipy.spatial.transform import Rotation
 
 # Anchor to the repo root / data/ folder, regardless of where this is launched.
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA = _REPO_ROOT / "data"
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame
+from us3d.handeye import find_handeye
+from us3d.paths import DATA, REPO_ROOT as _REPO_ROOT
 
 
 def resolve_section(arg):
@@ -44,25 +46,6 @@ def resolve_section(arg):
         if cand.exists():
             return cand
     sys.exit(f"❌ Section folder not found: {arg}")
-
-
-def load_frame(bin_path, meta):
-    f = meta["frame"]
-    lines, samples, bps = f["lines"], f["samples"], f["bps"]
-    jpg = f.get("jpg_size", 0)
-    raw = bin_path.read_bytes()
-    if jpg > 0:
-        from PIL import Image
-        import io
-        return np.array(Image.open(io.BytesIO(raw)).convert("L")).astype(np.float32)
-    dtype = np.uint8 if bps == 8 else np.uint16
-    arr = np.frombuffer(raw, dtype=dtype)
-    expected = lines * samples
-    if arr.size != expected:
-        usable = (arr.size // lines) * lines
-        arr = arr[:usable]
-        samples = usable // lines
-    return arr.reshape(lines, samples).T.astype(np.float32)
 
 
 def splat_trilinear(accum, weight, coords_vox, vals):
@@ -167,13 +150,8 @@ def main():
 
     sections = [resolve_section(s) for s in args.sections]
 
-    cands = [Path(args.handeye)] if args.handeye else [sections[0] / "handeye.json", _REPO_ROOT / "calib" / "handeye.json"]
-    he, he_path = None, None
-    for c in cands:
-        if c and c.exists():
-            he = json.loads(c.read_text()); he_path = c; break
-    if he is None:
-        sys.exit("❌ No handeye.json found. Pass --handeye PATH or copy it to the project root.")
+    he_path = find_handeye(sections[0], args.handeye)
+    he = json.loads(he_path.read_text())
     R_X = np.array(he["R_flange_to_image"], float)
     t_X = np.array(he["t_flange_to_image_mm"], float)
     conv = he["convention"]

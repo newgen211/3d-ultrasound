@@ -30,8 +30,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, str(Path(__file__).parent))
-from segment_tube import find_section, load_frame, to_u8, candidates
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.sections import find_section
+from us3d.tube import candidates
 
 MAX_R_MM, EDGE_FRAC = 2.5, 0.06          # same guards as the SAM exemplar
 SMOOTH = 5                                # frames, majority vote
