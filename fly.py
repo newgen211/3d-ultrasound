@@ -153,21 +153,77 @@ def solve():
     return p.stderr
 
 
-def start_tracker():
+TRACKER_PATTERN = "src/pose/track_probe.py"
+
+
+def _tracker_pids():
+    out = subprocess.run(["pgrep", "-f", TRACKER_PATTERN],
+                         stdout=subprocess.PIPE, text=True).stdout.split()
+    return [q for q in out if q != str(os.getpid())]
+
+
+def _kill_tracker(p=None):
+    """SIGINT first: track_probe closes its log in a finally, SIGTERM skips it."""
+    if p is not None and p.poll() is None:
+        subprocess.run(["sudo", "kill", "-INT", str(p.pid)])
+        try:
+            p.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            subprocess.run(["sudo", "kill", "-9", str(p.pid)])
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+
+
+def kill_stale_trackers():
+    """A run that died hard leaves a root-owned tracker holding the camera."""
+    pids = _tracker_pids()
+    if not pids:
+        return
+    print(f"  killing leftover track_probe: {' '.join(pids)}", flush=True)
+    subprocess.run(["sudo", "kill", "-INT"] + pids)
+    time.sleep(3)
+    still = _tracker_pids()
+    if still:
+        subprocess.run(["sudo", "kill", "-9"] + still)
+        time.sleep(1)
+    note(killed_stale_trackers=pids)
+
+
+def start_tracker(timeout=30):
+    """Start track_probe and wait until its log actually grows.
+
+    Warm-up is not a fixed cost: the RealSense settles, then a marker has to come
+    into view before the first pose is written. So poll for growth rather than
+    sleep a guessed interval. Anything that fails here stops the process it
+    started, so a failed gate cannot leave a root-owned tracker on the camera.
+    """
+    kill_stale_trackers()
+    cam = LOGS / "probe_pose_log.jsonl"
+    size0 = cam.stat().st_size if cam.exists() else 0
     p = subprocess.Popen(["sudo", PY_RS, "src/pose/track_probe.py"],
                          stdout=open(run / "track_probe.out", "w"), stderr=subprocess.STDOUT)
-    time.sleep(6)
-    cam = LOGS / "probe_pose_log.jsonl"
-    gate(cam.exists() and time.time() - cam.stat().st_mtime < 3, "cam log not growing")
-    return p
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        time.sleep(1)
+        waited = time.time() - t0
+        if p.poll() is not None:
+            raise SystemExit(f"ABORT: track_probe exited after {waited:.0f} s, "
+                             f"see {run / 'track_probe.out'}")
+        if cam.exists() and cam.stat().st_size > size0:
+            print(f"  tracker warmed up in {waited:.0f} s", flush=True)
+            note(tracker_warmup_s=round(waited, 1))
+            return p
+        if int(waited) % 10 == 0 and waited >= 10:
+            print(f"  waiting for the first pose ({waited:.0f}/{timeout} s) ...", flush=True)
+    _kill_tracker(p)
+    raise SystemExit(f"ABORT: {cam} did not grow in {timeout} s. track_probe is running "
+                     f"but writing no poses: is a marker in view? See {run / 'track_probe.out'}")
 
 
 def stop_tracker(p):
-    subprocess.run(["sudo", "kill", "-INT", str(p.pid)])
-    try:
-        p.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        subprocess.run(["sudo", "kill", str(p.pid)])
+    _kill_tracker(p)
     cam, snap = LOGS / "probe_pose_log.jsonl", LOGS / f"sec{sec}_cam.jsonl"
     if cam.exists():
         subprocess.run(["sudo", "mv", cam, snap])

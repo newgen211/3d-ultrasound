@@ -49,7 +49,8 @@ runs/<MMDD_HHMM>_sec<N>/
   solve.log         shift_joint_path's report (the '#' lines; preflight audits these)
   anchor.json       the vision anchor the flight was solved against
   shifted_<stamp>.jsonl   the launch file that flew
-  track_probe.out   tracker output
+  track_probe.out   tracker output (manifest records tracker_warmup_s, and any
+                    leftover tracker it had to kill first)
 ```
 
 ## Smoke steps, in order
