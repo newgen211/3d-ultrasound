@@ -1,13 +1,15 @@
 import json, glob, sys
 from pathlib import Path
 import numpy as np, cv2
-sys.path.insert(0, "src/segment")
-from segment_tube import load_frame, to_u8
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.paths import model as _model
+from us3d.sections import find_section
 from ultralytics import YOLO
 
-sec = Path("data/clarius_sessions/section_118")
+sec = find_section(sys.argv[1] if len(sys.argv) > 1 else "section_118")
 raws = sorted(glob.glob(str(sec / "raw_*.json")))
-model = YOLO("models/best_regated.pt")
+model = YOLO(str(_model("best_regated.pt")))
 det = conf_max = 0
 confs = []
 for i in range(0, len(raws), 5):

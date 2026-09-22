@@ -1,11 +1,13 @@
 import json, glob, sys, os
 from pathlib import Path
 import numpy as np, cv2
-sys.path.insert(0, "src/segment")
-from segment_tube import load_frame, to_u8
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.sections import find_section
+from us3d.video import finalize, fit_frame, open_writer
 
-sec_name = sys.argv[1]
-sec = Path(f"data/clarius_sessions/{sec_name}")
+sec = find_section(sys.argv[1])
+sec_name = sec.name
 raws = sorted(glob.glob(str(sec / "raw_*.json")))
 dets = json.loads((sec / "sam_detections.json").read_text())["detections"]
 byf = {}
@@ -17,14 +19,7 @@ kappa = {i: v for i, v in enumerate(ks.get("frame_kappa", []))}
 mf0 = json.load(open(raws[0]))
 u80 = to_u8(load_frame(Path(raws[0].replace(".json", ".bin")), mf0))
 H, W = u80.shape
-vw, outname = None, None
-for name, fcc in [(f"kappa_{sec_name}.mp4", "avc1"),
-                  (f"kappa_{sec_name}.mp4", "mp4v"),
-                  (f"kappa_{sec_name}.avi", "MJPG")]:
-    c = cv2.VideoWriter(name, cv2.VideoWriter_fourcc(*fcc), 20, (W, H))
-    if c.isOpened(): vw, outname = c, name; break
-    c.release()
-if vw is None: sys.exit("no codec")
+vw, outpath = open_writer("kappa_%s" % sec_name, (W, H), fps=20)
 
 for i, jp in enumerate(raws):
     mf = json.load(open(jp))
@@ -44,8 +39,6 @@ for i, jp in enumerate(raws):
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, col, 1)
     cv2.putText(fr, f"{sec_name} f{i}", (6, 16),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
-    vw.write(fr)
-vw.release()
-sz = os.path.getsize(outname)
-if sz < 100_000: sys.exit(f"{outname} empty — tell Claude")
-print(f"wrote {os.path.abspath(outname)} ({sz/1e6:.1f} MB)")
+    vw.write(fit_frame(fr, (W, H)))
+finalize(vw, outpath)
+print("wrote %s (%.1f MB)" % (outpath, outpath.stat().st_size / 1e6))

@@ -3,11 +3,14 @@ from pathlib import Path
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
-sys.path.insert(0, "src/segment")
-from segment_tube import load_frame, to_u8, candidates
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.paths import out_dir
+from us3d.sections import find_section
+from us3d.tube import candidates
 
 def sheet(sec_name, idxs, out_png):
-    sec = Path("data/clarius_sessions") / sec_name
+    sec = find_section(sec_name)
     raws = sorted(glob.glob(str(sec / "raw_*.json")))
     rep_p = sec / "compression_report.json"
     rep = json.loads(rep_p.read_text())["frames"] if rep_p.exists() else None
@@ -31,10 +34,21 @@ def sheet(sec_name, idxs, out_png):
     for ax in axes.flat[len(idxs):]:
         ax.axis("off")
     fig.tight_layout()
-    fig.savefig(out_png, dpi=110)
-    print("wrote", out_png)
+    out = out_dir("figures") / out_png
+    fig.savefig(out, dpi=110)
+    print("wrote", out)
 
-sheet("section_118",
-      list(range(505, 541, 3)) + list(range(694, 736, 3)),
-      "viz_118_zones.png")
-sheet("section_115", list(range(40, 940, 75)), "viz_115_sampled.png")
+# The sheets this was built for. The section_106 one was viz_ctrl.py, which
+# was this same function inlined for a single section.
+PRESETS = {
+    "section_118": (list(range(505, 541, 3)) + list(range(694, 736, 3)), "zones_118.png"),
+    "section_115": (list(range(40, 940, 75)), "sampled_115.png"),
+    "section_106": (list(range(60, 880, 70)), "sampled_106.png"),
+}
+
+wanted = sys.argv[1:] or ["section_118", "section_115"]
+for name in wanted:
+    if name not in PRESETS:
+        sys.exit("no preset for %s (have: %s)" % (name, ", ".join(sorted(PRESETS))))
+    idxs, out_png = PRESETS[name]
+    sheet(name, idxs, out_png)

@@ -2,7 +2,10 @@
 import json, glob, itertools
 import numpy as np
 from pathlib import Path
-ROOT = Path("data/clarius_sessions"); CAM = Path("data/pose_logs/probe_pose_log_smooth.jsonl")
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import POSE_LOGS, SESSIONS
+ROOT = SESSIONS; CAM = POSE_LOGS / "probe_pose_log_smooth.jsonl"
 def span(sec):
     ts=[int(json.load(open(f)).get("host_timestamp_ns") or 0) for f in glob.glob(str(ROOT/sec/"*.json"))]
     ts=[t for t in ts if t]; return min(ts), max(ts)

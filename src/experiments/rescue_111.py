@@ -4,8 +4,11 @@ import json, glob
 import numpy as np
 from pathlib import Path
 
-ROOT  = Path("data/clarius_sessions")
-CAM   = Path("data/pose_logs/probe_pose_log_smooth.jsonl")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import POSE_LOGS, SESSIONS
+
+ROOT  = SESSIONS
+CAM   = POSE_LOGS / "probe_pose_log_smooth.jsonl"
 ERA_A = ["section_106", "section_108", "section_109"]
 ERA_B = "section_111"
 IDS   = [1, 2, 3]

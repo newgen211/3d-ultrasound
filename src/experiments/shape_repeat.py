@@ -4,7 +4,10 @@ import json
 import numpy as np
 from pathlib import Path
 
-ROOT = Path("data/clarius_sessions")
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.paths import POSE_LOGS, SESSIONS
+
+ROOT = SESSIONS
 SECS = ["section_106", "section_108", "section_109", "section_111"]
 N = 200
 
