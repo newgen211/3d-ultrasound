@@ -3,44 +3,32 @@
 
 ## Network / machines
 - Pi: `ssh er@192.168.196.134`  (ZeroTier `MyCobot320`; Mac = 192.168.196.41)
-- Pi clock shows UTC — epoch ns are NTP-synced to the Mac (measured −0.2 s)
-- Clarius = its own WiFi AP → joining it kills Mac↔Pi. Use tmux + `--delay`.
+- Pi wall clock is Asia/Shanghai (UTC+8), so exec_<stamp> names are CST; the epoch ns
+  inside the logs are NTP-synced to the Mac (+0.6 s on 22 Sep; trim correlates it out)
+- Clarius = its own WiFi AP. The Pi joins it on wlan0 (eth0 keeps ZeroTier); the Mac never does.
 
-## AUTONOMOUS SWEEP (the whole loop)
+## ONE-BUTTON SWEEP (the whole loop)
 ```
-# Mac — anchor (camera at tape marks; MUST print "color stream: 640x480"):
-sudo PYTHONDONTWRITEBYTECODE=1 /opt/anaconda3/envs/realsense/bin/python \
-  src/calibration/guided_sweep_reader.py     # --calib defaults to calib/guided_sweep_calib.json
-#   ignore its waypoint printout (vestigial); it writes calib/vision_anchor.json
-
-# Mac — solve (self-gating: align RMS ~0.36, FK <=2.5mm, steps <3°):
-cd ultrasound-cobot && python shift_joint_path.py sweep_teach.jsonl > shifted_sweep.jsonl; cd ..
-#   (that subproject runs from inside its own folder)
-scp shifted_sweep.jsonl er@192.168.196.134:~/Documents/ultrasound-cobot/pose_logs/
-
-# Mac — probe tracker (leave running; local, WiFi-independent):
-sudo PYTHONDONTWRITEBYTECODE=1 /opt/anaconda3/envs/realsense/bin/python src/pose/track_probe.py
-
-# Pi — execute (INSIDE tmux; --rate 2 = slow/quality cadence):
-tmux new -s sweep
-python3 execute_sweep.py shifted_sweep.jsonl --speed 25 --rate 2 --delay 45
-#   execute_sweep.py lives ONLY on the Pi - it is in neither git repo.
-#   outputs/pi_mirror/apply_offsets.py imports it, so that mirror is not
-#   runnable off the Pi either. Copy it into the mirror next Pi session.
-#   during countdown: Mac -> Clarius WiFi, start pysidecaster capture
-#   after: Mac -> lab WiFi, `tmux attach -t sweep`, Enter to home
-#   outputs: pose_logs/exec_<stamp>.jsonl + exec_<stamp>_meta.json
+sudo chown -R $USER calib/          # once; the reader used to leave root-owned files
+make sweep                          # = fly.py: gates -> anchor -> solve -> deploy -> tracker
+                                    #   -> Pi flight (capture + arm) -> fetch -> verify -> make post
+TEACH=sweep_teach_up2.jsonl make sweep      # other taught skill (default: clamp15)
+#   everything for the run: runs/<stamp>_sec<N>/{fly.log,solve.log,anchor.json,manifest.json}
+#   one sudo prompt up front (reader + tracker run as root with the realsense python)
 ```
-
-## POST-CAPTURE
+Stage by stage, if you need to redo one (each is skipped when its artifact is newer):
 ```
-mv data/pose_logs/probe_pose_log.jsonl data/pose_logs/sec<N>_cam.jsonl   # snapshot!
-python src/pose/trim_section.py section_<N> <exec.jsonl> <meta.json> data/pose_logs/sec<N>_cam.jsonl
-#   check: offset ~0.0s, lag ~ your --delay, keep count sane  ->  rerun --apply
-python src/pose/smooth_cam_log.py data/pose_logs/sec<N>_cam.jsonl data/pose_logs/sec<N>_cam_smooth.jsonl
-python src/pose/merge_poses_cam.py section_<N> data/pose_logs/sec<N>_cam_smooth.jsonl
-python src/reconstruct/reconstruct_handeye.py section_<N>       # uses calib/handeye.json = section_60's 2.20mm
-# drift audit (expect <1mm taped): id3-during-capture one-liner (handoff 07-09)
+make post SEC=<N>                   # trim -> smooth -> merge -> reconstruct -> vessels
+make trim|smooth|merge|reconstruct|vessels SEC=<N>
+make clean-stamps SEC=<N>           # force trim + merge to rerun
+#   inputs: data/clarius_sessions/section_<N>/{exec.jsonl,exec_meta.json}  data/pose_logs/sec<N>_cam.jsonl
+#   trim refuses (exit 1) on: weak correlation, NaN peak, under half the frames kept,
+#   or |Pi->Mac offset| > 5 s (--max-offset widens it for a deliberately drifted clock)
+```
+Pi smoke test, probe awake, before the first real flight (see ONE_BUTTON.md):
+```
+ssh er@192.168.196.134 'cd ~/Documents/ultrasound-cobot && python3.10 cast_headless.py --section 900 --ip 192.168.1.1 --port 5828 --seconds 10'
+#   pass = raw_*.bin/.json on disk under clarius_sessions/section_900 and imu_sample_count > 0
 ```
 
 ## VESSELS
@@ -97,9 +85,13 @@ python3 touch_calib.py                    # Pi; gimbal-safe version
 ## FILE MAP
 | File | Role |
 |---|---|
+| `fly.py` + `Makefile` | the button: one acquisition, then the file-keyed post chain |
+| `run_sweep.py` | `preflight()` gates (imported by fly.py); its own CLI is the manual flow |
+| `src/capture/cast_capture.py` | capture core shared by the GUI and `cast_headless.py` (Pi) |
+| `ultrasound-cobot/flight.sh` | Pi: probe WiFi -> headless capture -> arm -> pair exec log |
 | `src/calibration/guided_sweep_reader.py` | perceive: markers -> calib/vision_anchor.json |
 | `ultrasound-cobot/shift_joint_path.py` + `calib/mycobot_320_pi.urdf` | plan: taught skill + anchor -> verified joints |
-| `execute_sweep.py` (Pi) | act: joint playback + exec log + manifest |
+| `ultrasound-cobot/execute_sweep.py` | act: joint playback + exec log + manifest (`--no-prompt` for flight.sh) |
 | `src/pose/trim_section.py` | drop hover/retract frames (clock-aligned) |
 | `src/pose/smooth_cam_log.py` | pose smoothing pre-merge (servo sweeps) |
 | `src/pose/merge_poses_cam.py` | camera poses -> frame sidecars |
