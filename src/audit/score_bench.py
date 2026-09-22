@@ -1,11 +1,12 @@
 import json, glob, sys
 import numpy as np, cv2
 from pathlib import Path
-sys.path.insert(0, "src/segment")
-from segment_tube import load_frame, to_u8
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.paths import AUDIT_TRUTH, MODELS, SESSIONS
 from ultralytics import YOLO
 
-TRUTH = json.load(open("audit/audit_truth.json"))
+TRUTH = json.loads(AUDIT_TRUTH.read_text())
 MATCH_MM = 3.0
 
 def entries():
@@ -19,11 +20,12 @@ def is_open(u8, x, y, r):
     patch = u8[max(y-r,0):y+r, max(x-r,0):x+r]
     return patch.size > 0 and patch.mean() < 0.75*np.median(u8)
 
-for mp in ["models/best_regated.pt", "models/bench_s.pt", "models/bench_m.pt", "models/gold_n.pt"]:
-    model = YOLO(mp)
+for mp in [MODELS / "best_regated.pt", MODELS / "bench_s.pt",
+           MODELS / "bench_m.pt", MODELS / "gold_n.pt"]:
+    model = YOLO(str(mp))
     allt = [0,0,0]
     for sec, fi, vessels in entries():
-        g = sorted(glob.glob(f"data/clarius_sessions/{sec}/raw_*.json"))
+        g = sorted(glob.glob(str(SESSIONS / sec / "raw_*.json")))
         if fi >= len(g): continue
         mf = json.load(open(g[fi]))
         u8 = to_u8(load_frame(Path(g[fi].replace(".json",".bin")), mf))

@@ -1,11 +1,13 @@
 import json, sys, glob
 import numpy as np
 from pathlib import Path
-sys.path.insert(0, "src/segment")
-import segment_tube as st
-from segment_tube import load_frame, to_u8, candidates
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+import us3d.tube as st
+from us3d.frames import load_frame, to_u8
+from us3d.tube import candidates
+from us3d.paths import AUDIT_TRUTH, MODELS, SESSIONS
 
-TRUTH = json.load(open("audit/audit_truth.json"))
+TRUTH = json.loads(AUDIT_TRUTH.read_text())
 MATCH_MM = 3.0
 
 def entries():
@@ -25,7 +27,7 @@ def run(tag, tweak):
     tweak()
     rows, allt = {}, [0,0,0]
     for sec, fi, vessels in entries():
-        g = sorted(glob.glob(f"data/clarius_sessions/{sec}/raw_*.json"))
+        g = sorted(glob.glob(str(SESSIONS / sec / "raw_*.json")))
         if fi >= len(g): continue
         jp = Path(g[fi])
         meta_full = json.load(open(jp))
@@ -64,7 +66,7 @@ run("classical NO-CROP", lambda: setattr(st, "TOP_CROP_MM", 0.5))
 
 ds, above = [], 0
 for sec, fi, vessels in entries():
-    g = sorted(glob.glob(f"data/clarius_sessions/{sec}/raw_*.json"))
+    g = sorted(glob.glob(str(SESSIONS / sec / "raw_*.json")))
     if fi >= len(g): continue
     ax = json.load(open(g[fi]))["frame"]["axial_um_per_sample"]/1000.0
     for v in vessels: ds.append(v[1]*ax)
@@ -77,18 +79,18 @@ print(f"\ntruth vessel depths (ALL morphs): n={len(ds)}  above 3.0mm: "
 # ---- student arm: best_regated @ 0.25, jpg domain, same matching ----
 import cv2
 from ultralytics import YOLO
-model = YOLO("models/best_regated.pt")
+model = YOLO(str(MODELS / "best_regated.pt"))
 
 rows, allt = {}, [0,0,0]
 for sec, fi, vessels in entries():
-    g = sorted(glob.glob(f"data/clarius_sessions/{sec}/raw_*.json"))
+    g = sorted(glob.glob(str(SESSIONS / sec / "raw_*.json")))
     if fi >= len(g): continue
     meta_full = json.load(open(g[fi]))
     meta = meta_full["frame"]
     img = load_frame(Path(g[fi].replace(".json",".bin")), meta_full)
     u8 = to_u8(img)
     ax, lat = meta["axial_um_per_sample"]/1000.0, meta["lateral_um_per_line"]/1000.0
-    jp = Path(f"data/clarius_sessions/{sec}/frames_jpg/{fi:05d}.jpg")
+    jp = SESSIONS / sec / "frames_jpg" / ("%05d.jpg" % fi)
     if jp.exists():
         rgb = cv2.imread(str(jp))
     else:
