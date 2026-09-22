@@ -1,0 +1,24 @@
+# clarius — Clarius capture + the scoring oracle. PySide6 is pinned to 6.5.3 to stay
+#   close to the Qt that libcast.dylib embeds; a mismatch segfaults on load.
+#   This is the env the frozen paper/ref_*.txt numbers were produced in.
+# Recreate with:  conda env create -f environment/clarius.yml
+
+name: clarius
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - PySide6==6.5.3
+    - matplotlib==3.10.9
+    - nibabel==5.4.2
+    - numpy==1.26.4
+    - opencv-python==4.13.0.92
+    - pillow==12.2.0
+    - plotly==6.7.0
+    - scikit-learn==1.7.2
+    - scipy==1.15.3
+    - torch==2.2.2
+    - torchvision==0.17.2
+    - ultralytics==8.4.115

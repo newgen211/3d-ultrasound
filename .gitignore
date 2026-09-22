@@ -78,7 +78,8 @@ pose_logs/exec_*
 # --- additions Aug 31: gold-label sprint + gauge/E5 era ---
 overlays/
 attic/
-models/
+models/*
+!models/README.md
 *.pt
 *.mp4
 *.avi

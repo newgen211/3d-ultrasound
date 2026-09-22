@@ -1,0 +1,16 @@
+# sam3 — The SAM 3 teacher. Also needs the vendored src/segment/sam3 installed:
+#   pip install -e src/segment/sam3
+# Recreate with:  conda env create -f environment/sam3.yml
+
+name: sam3
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+    - matplotlib==3.11.0
+    - numpy==1.26.4
+    - pillow==12.2.0
+    - torch==2.2.2
+    - torchvision==0.17.2

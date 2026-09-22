@@ -509,3 +509,61 @@ Everything in Group 1 is unblocked today. The phantom and force sensor gate the
 high-risk perception and contact work — so the smart move is to finish all the
 software groundwork now, so that when the boxes arrive you're dropping real
 components into a loop that already runs.
+
+---
+
+# Addendum — August–September 2026 (the E-series)
+
+*Added 2026-09-22. Everything above predates this. Where it conflicts with this
+section on status, this section is current; the 2026-06-12 open-loop changelog
+still governs architecture.*
+
+The work since the last plan update was run as numbered experiments, E1 to E5,
+not as D-tasks. The vocabulary appears throughout the code and commit history
+but had never been written down here. The mapping:
+
+| Experiment | Question | Where it lives | D-task it advances |
+|---|---|---|---|
+| **E1** | Do identical commands produce the same vessel geometry? | `src/experiments/shape_repeat.py`, `diag_markers.py`, `rescue_111.py`; flights 106/108/109/111 | D10 repeatability |
+| **E5** | Does closed-loop contact supervision reduce over-compression? | `src/supervise/` (`gauge.py` offline, `supervisor_v3.py` live), flights 133–143 split OFF/ON | D8 contact control, by a different route |
+
+E2 to E4 were the label and detector work that made E5 possible: the SAM 3
+teacher, the human audit set, and the YOLO students.
+
+### What actually got built
+
+- **A human truth set.** 160 audited frames in `audit/audit_truth.json`, plus
+  451 hand-drawn labels in `yolo_ds_human/labels/`. These are the only
+  artifacts in the repo that cannot be regenerated.
+- **A detector line.** Teacher (SAM 3) → filtered labels → YOLO students. Best
+  at freeze: `gold_n` at F1 0.686, `bench_m` at 0.675, against classical at
+  0.242. Frozen in `paper/ref_score_bench_stdout.txt`.
+- **Contact supervision, closed loop on hardware.** The gauge reads lumen
+  geometry per frame, maps state to a cumulative `dz`, and sends it to the arm
+  at 2 Hz. Eight flights flew it, five with supervision off and three on.
+
+### Status rows above that are now wrong
+
+- *"Tube segmentation — prototyped, target was bad, 18% on section_22"* is
+  three eras stale. The classical detector it refers to is now a baseline
+  (F1 0.242) that a trained student beats nearly threefold.
+- *"Vessel detection/path planning — not started"* is wrong for the detection
+  half, which is what the whole E2–E5 arc built.
+- *"Cobot motion control — re-scoped, open-loop path execution"* is right about
+  the path, but a supervision loop now runs on top of it.
+
+Still genuinely open: **D2** multi-sweep compounding (`compound_handeye.py`
+exists but is unvalidated), **D8** force-based admittance control (the gauge is
+an image-based substitute, not a force loop), and **D9** the full autonomous
+run.
+
+### Known gaps in the record
+
+- `execute_sweep.py`, which the Pi actually runs, is in neither git repo.
+  `outputs/pi_mirror/apply_offsets.py` imports it, so that mirror will not run
+  off the Pi. Copy it in during the next Pi session.
+- 12 of the 14 figures in `paper/figs/` have no generator; the E5 pair no
+  longer reproduces because its inputs were regenerated after the freeze. See
+  `paper/README.md`.
+- Three of the four checkpoints behind the bench table are untracked. See
+  `models/README.md`.

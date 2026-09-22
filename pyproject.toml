@@ -1,0 +1,37 @@
+# Packaging metadata for the us3d helper library.
+#
+# Installing this is OPTIONAL and nothing in the repo depends on it. Scripts
+# reach us3d with a three-line sys.path bootstrap instead, so they run in every
+# conda env, under sudo, and from a fresh clone with no install step. See
+# src/us3d/__init__.py.
+#
+# The value of this file is the dependency record below: it says which packages
+# each part of the pipeline needs, which the conda exports in environment/
+# pin to exact builds.
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "us3d"
+version = "0.1.0"
+description = "Shared helpers for the robotic 3D ultrasound pipeline"
+requires-python = ">=3.9"
+dependencies = ["numpy", "opencv-python"]
+
+[project.optional-dependencies]
+# Reconstruction, segmentation geometry and the figure generators.
+recon = ["scipy", "nibabel", "matplotlib", "scikit-learn", "pillow", "plotly"]
+# Probe pose tracking and camera calibration. Needs a RealSense on USB.
+realsense = ["pyrealsense2", "scipy", "opencv-python"]
+# Detector training, scoring and the SAM 3 teacher.
+ml = ["torch", "ultralytics"]
+# Clarius capture. PySide6 must stay close to the Qt that libcast embeds.
+capture = ["PySide6==6.5.3"]
+# Arm-side planning; the Pi scripts live in the ultrasound-cobot submodule.
+cobot = ["pymycobot", "ikpy"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["us3d"]

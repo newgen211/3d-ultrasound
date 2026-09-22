@@ -1,0 +1,21 @@
+# realsense — RealSense probe tracking and camera calibration. pyrealsense2 comes from
+#   the conda librealsense package, not pip. The camera must open 640x480.
+# Recreate with:  conda env create -f environment/realsense.yml
+
+name: realsense
+channels:
+  - defaults
+dependencies:
+  - numpy
+  - librealsense
+  - opencv
+  - scipy
+  - python=3.11
+  - pip
+  - pip:
+    - ikpy==4.0.0
+    - nibabel==5.4.2
+    - numpy==2.4.6
+    - opencv-contrib-python==4.13.0.92
+    - opencv-python==4.13.0
+    - scipy==1.17.1

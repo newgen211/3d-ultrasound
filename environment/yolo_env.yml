@@ -1,0 +1,18 @@
+# yolo_env — Detector training and the older ultralytics line (8.3.x).
+# Recreate with:  conda env create -f environment/yolo_env.yml
+
+name: yolo_env
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+    - matplotlib==3.9.4
+    - numpy==1.26.4
+    - opencv-python==4.11.0.86
+    - pillow==11.1.0
+    - scipy==1.13.1
+    - torch==2.2.2
+    - torchvision==0.17.2
+    - ultralytics==8.3.69
