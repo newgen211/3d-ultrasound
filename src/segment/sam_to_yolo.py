@@ -41,7 +41,7 @@ def process(sec_name, split, out, counts):
         sys.exit(f"{sec_name}: no sam_detections.json — run SAM first")
     jpg_dir = sec / "frames_jpg"
     if not jpg_dir.exists():
-        sys.exit(f"{sec_name}: no frames_jpg/ — rerun sam3_track with --keep-jpg "
+        sys.exit(f"{sec_name}: no frames_jpg/ — rerun sam3_track_v2 with --keep-jpg "
                  f"(or scp the folder from Newton)")
     dd = json.loads(dets_path.read_text())["detections"]
     by_frame = {}

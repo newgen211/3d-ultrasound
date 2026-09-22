@@ -8,7 +8,7 @@ width that beam-spread blooms. Red dot = centroid. Title shows instance count.
 
     python3 sam_overlay.py section_59
 
-Needs frames_jpg/ (run sam3_track.py with --keep-jpg).
+Needs frames_jpg/ (run sam3_track_v2.py with --keep-jpg).
 Output: sam_overlay.png in the section folder.
 """
 import json, sys
@@ -22,7 +22,7 @@ section = find_section(sys.argv[1] if len(sys.argv) > 1 else None)
 det = json.loads((section / "sam_detections.json").read_text())["detections"]
 jpg_dir = section / "frames_jpg"
 if not jpg_dir.exists():
-    sys.exit("no frames_jpg/ — re-run sam3_track.py with --keep-jpg")
+    sys.exit("no frames_jpg/ — re-run sam3_track_v2.py with --keep-jpg")
 
 by_frame = {}
 for d in det:
