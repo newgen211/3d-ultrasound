@@ -27,11 +27,13 @@ file and tells you exactly what to type, then supervises the recording side.
 import argparse, json, os, re, subprocess, sys, time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+from us3d.paths import CALIB, POSE_LOGS, SESSIONS
+
 PI = "er@192.168.196.134"
 PI_DIR = "~/Documents/ultrasound-cobot/pose_logs/"
-SESSIONS = Path("data/clarius_sessions")
-CAM_LOG = Path("data/pose_logs/probe_pose_log.jsonl")
-ANCHOR = Path("src/calibration/vision_anchor.json")
+CAM_LOG = POSE_LOGS / "probe_pose_log.jsonl"
+ANCHOR = CALIB / "vision_anchor.json"
 ANCHOR_MAX_AGE_MIN = 30
 
 def fail(msg):
@@ -107,7 +109,7 @@ def main():
         except Exception:
             warn("could not parse anchor timestamp")
     else:
-        warn("no vision_anchor.json found next to src/calibration")
+        warn("no vision_anchor.json in calib/ - run guided_sweep_reader.py")
 
     # 3. camera log ALIVE (track_probe must be running RIGHT NOW)
     print("checking camera log is growing (2 s) ...")
