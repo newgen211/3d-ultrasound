@@ -4,19 +4,22 @@ section; per fresh frame runs the detector-anchored gauge; at 2 Hz maps
 state -> cumulative dz and sends {"dz": x} to the Pi (absolute, idempotent).
 --shadow: full pipeline, log only, nothing sent.
 Frame safety: only consumes raw N once raw N+1's json exists (mid-write guard).
-Usage: python3 supervisor_v3.py --section section_124 --model models/best_regated.pt \
+Usage: python3 src/supervise/supervisor_v3.py --section section_124 --model best_regated.pt \
          --pi 192.168.196.134 [--shadow]
 """
 import argparse, json, glob, socket, sys, time
 from pathlib import Path
 import numpy as np, cv2
-sys.path.insert(0, "src/segment")
-from segment_tube import load_frame, to_u8
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.paths import model as _model
+from us3d.sections import find_section
 from ultralytics import YOLO
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--section", required=True)
-ap.add_argument("--model", default="models/best_regated.pt")
+ap.add_argument("--model", default="best_regated.pt",
+                help="checkpoint: a path, or a name under models/")
 ap.add_argument("--pi", default="192.168.196.134")
 ap.add_argument("--port", type=int, default=5006)
 ap.add_argument("--shadow", action="store_true")
@@ -48,7 +51,7 @@ def profile_h(u8, cy, cx, hh, hw, ax):
     return dict(h_mm=best*ax, contrast=float(wall-lum), row=r0+(bs+be)/2.0,
                 lum=float(lum))
 
-model = YOLO(args.model)
+model = YOLO(str(_model(args.model)))
 def detect(u8):
     ok, buf = cv2.imencode(".jpg", u8)
     res = model.predict(cv2.imdecode(buf, cv2.IMREAD_COLOR),
@@ -57,8 +60,8 @@ def detect(u8):
     return [(float(b[0]), float(b[1]), float(b[2]), float(b[3]))
             for b in res.boxes.xywh.cpu().numpy()]
 
-sec = Path("data/clarius_sessions") / args.section
-print(f"supervising {sec}  model={args.model}  shadow={args.shadow}")
+sec = find_section(args.section)
+print(f"supervising {sec}  model={_model(args.model)}  shadow={args.shadow}")
 sock = None
 def send_dz(dz):
     global sock

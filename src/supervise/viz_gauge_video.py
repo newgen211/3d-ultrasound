@@ -1,13 +1,17 @@
-import json, glob, sys, os
+"""Overlay video of a gauge replay: the ROI box coloured by state."""
+import json, glob, sys
 from pathlib import Path
 import numpy as np, cv2
-sys.path.insert(0, "src/segment")
-from segment_tube import load_frame, to_u8
 
-sec = sys.argv[1] if len(sys.argv) > 1 else "section_106"
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.sections import find_section
+from us3d.video import finalize, fit_frame, open_writer
+
+sec = find_section(sys.argv[1] if len(sys.argv) > 1 else "section_106")
 rows = {r["frame"]: r for r in
-        (json.loads(l) for l in open(f"data/clarius_sessions/{sec}/gauge_replay.jsonl"))}
-raws = sorted(glob.glob(f"data/clarius_sessions/{sec}/raw_*.json"))
+        (json.loads(l) for l in open(sec / "gauge_replay.jsonl"))}
+raws = sorted(glob.glob(str(sec / "raw_*.json")))
 COL = {"GOOD": (80, 220, 80), "SQUEEZING": (0, 200, 255),
        "PRESSED": (60, 60, 255), "WASHED": (255, 200, 0),
        "MIGRATE": (255, 0, 255), "ACQ": (160, 160, 160), "LOST": (0, 0, 0)}
@@ -15,17 +19,7 @@ mf0 = json.load(open(raws[0]))
 u80 = to_u8(load_frame(Path(raws[0].replace(".json", ".bin")), mf0))
 H, W = u80.shape
 
-vw, outname = None, None
-for name, fourcc in [(f"gauge_{sec}.mp4", "avc1"),
-                     (f"gauge_{sec}.mp4", "mp4v"),
-                     (f"gauge_{sec}.avi", "MJPG")]:
-    cand = cv2.VideoWriter(name, cv2.VideoWriter_fourcc(*fourcc), 20, (W, H))
-    if cand.isOpened():
-        vw, outname = cand, name
-        break
-    cand.release()
-if vw is None:
-    sys.exit("no working codec — tell Claude")
+vw, outpath = open_writer("gauge_%s" % sec.name, (W, H), fps=20)
 
 for i, jp in enumerate(raws):
     mf = json.load(open(jp))
@@ -41,9 +35,7 @@ for i, jp in enumerate(raws):
               (f" r={r['ratio']}" if r["ratio"] is not None else "") + \
               (f"  [{r['truth']}]" if r["truth"] else "")
         cv2.putText(fr, txt, (6, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.45, c, 1)
-    vw.write(fr)
-vw.release()
-sz = os.path.getsize(outname)
-if sz < 100_000:
-    sys.exit(f"{outname} only {sz} bytes — writer produced nothing, tell Claude")
-print(f"wrote {os.path.abspath(outname)}  ({sz/1e6:.1f} MB, {len(raws)} frames)")
+    vw.write(fit_frame(fr, (W, H)))
+finalize(vw, outpath)
+print("wrote %s  (%.1f MB, %d frames)"
+      % (outpath, outpath.stat().st_size / 1e6, len(raws)))

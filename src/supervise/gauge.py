@@ -2,18 +2,20 @@
 """gauge.py v5.1 — detector-anchored, geometry-gauged, CLASS-AWARE.
 class 0 (open): anchors ROI, blocks pinch, migrate target.
 class 1 (crushed): anchors ROI + POSITIVE pinch evidence (fast PRESSED).
-Usage: python3 gauge.py section_106 [models/gold_n.pt]
+Usage: python3 src/supervise/gauge.py section_106 [gold_n.pt]
 """
 import json, glob, sys
 from pathlib import Path
 from collections import Counter, deque
 import numpy as np
 import cv2
-sys.path.insert(0, "src/segment")
-from segment_tube import load_frame, to_u8
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from us3d.frames import load_frame, to_u8
+from us3d.paths import model as _model
+from us3d.sections import find_section
 from ultralytics import YOLO
 
-MODEL_PATH = sys.argv[2] if len(sys.argv) > 2 else "models/gold_n.pt"
+MODEL_PATH = _model(sys.argv[2]) if len(sys.argv) > 2 else _model("gold_n.pt")
 DET_CONF   = 0.25
 GATE_MM    = 5.0
 ANCHOR_EMA = 0.4
@@ -81,11 +83,11 @@ def try_lock(u8, box, deep, ax):
     return None
 
 def main():
-    sec = Path("data/clarius_sessions") / sys.argv[1]
+    sec = find_section(sys.argv[1] if len(sys.argv) > 1 else None)
     raws = sorted(glob.glob(str(sec / "raw_*.json")))
     rep_p = sec / "compression_report.json"
     rep = json.loads(rep_p.read_text())["frames"] if rep_p.exists() else None
-    model = YOLO(MODEL_PATH)
+    model = YOLO(str(MODEL_PATH))
     lock, votes, dead, blind, crushed_seen, episode, log = \
         None, deque(), 0, 0, 0, 0, []
     for i, jp in enumerate(raws):
